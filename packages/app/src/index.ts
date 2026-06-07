@@ -21,3 +21,17 @@ export {
 } from "./wsl/types"
 export { ServerConnection } from "./context/server"
 export { handleNotificationClick } from "./utils/notification-click"
+
+// Session region components re-exported for the yejian custom app
+export { MessageTimeline } from "./pages/session/message-timeline"
+export {
+  SessionComposerRegion,
+  createSessionComposerState,
+} from "./pages/session/composer"
+export { SessionReviewTab } from "./pages/session/review-tab"
+export { SessionSidePanel } from "./pages/session/session-side-panel"
+export { TerminalPanel } from "./pages/session/terminal-panel"
+// Context hooks re-exported for the yejian custom app
+export { useSDK } from "./context/sdk"
+export { useSync } from "./context/sync"
+export { useFile } from "./context/file"

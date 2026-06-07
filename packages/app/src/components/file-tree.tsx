@@ -325,7 +325,9 @@ export default function FileTree(props: {
   )
 
   const nodes = createMemo(() => {
-    const nodes = file.tree.children(props.path)
+    const isHidden = (n: { path?: string; name: string }) =>
+      (n.path ?? n.name).split("/").some((seg) => seg.startsWith("."))
+    const nodes = file.tree.children(props.path).filter((n) => !isHidden(n))
     const current = filter()
     if (!current) return nodes
 
@@ -380,7 +382,7 @@ export default function FileTree(props: {
       return a.name.localeCompare(b.name)
     })
 
-    return out
+    return out.filter((n) => !isHidden(n))
   })
 
   return (
