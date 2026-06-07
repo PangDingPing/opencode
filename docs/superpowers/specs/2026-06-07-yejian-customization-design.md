@@ -464,7 +464,29 @@ nodes = nodes.filter((n) => !n.name.startsWith("."))
 
 **冲突应对**：上游每次同步如果该文件冲突，按本节描述重新 patch；若上游大改 `nodes()` 已不存在，则改用 yejian 自写包装器（在 yejian 内 `useFile()` 生成过滤后的 `allowed` 数组传给原 FileTree）。
 
-### 5.2 根 `.gitignore`
+### 5.2 packages/app/src/index.ts
+
+`@opencode-ai/app` 当前只 re-export `AppBaseProviders`、`AppInterface` 等顶层组件，未暴露 SessionPage 内部 region。yejian 要复用这些 region 必须先把它们 export 出来：
+
+```ts
+// 在 packages/app/src/index.ts 末尾追加（约 9 行）
+export { MessageTimeline } from "./pages/session/message-timeline"
+export {
+  SessionComposerRegion,
+  createSessionComposerState,
+} from "./pages/session/composer"
+export { SessionReviewTab } from "./pages/session/review-tab"
+export { SessionSidePanel } from "./pages/session/session-side-panel"
+export { TerminalPanel } from "./pages/session/terminal-panel"
+// 上下文 hooks（yejian 数据获取依赖）
+export { useSDK } from "./context/sdk"
+export { useSync } from "./context/sync"
+export { useFile } from "./context/file"
+```
+
+**冲突应对**：上游若重构这些组件路径或导出名，每次同步上游后需同步更新此处。冲突解决比 file-tree.tsx 更直接（改路径而非合并逻辑）。
+
+### 5.3 根 `.gitignore`
 
 ```
 .superpowers/
@@ -472,7 +494,7 @@ nodes = nodes.filter((n) => !n.name.startsWith("."))
 
 （已添加）
 
-**这两处之外，packages/* 一律不动**。
+**这三处之外，packages/* 一律不动**。
 
 ---
 
