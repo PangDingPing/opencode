@@ -486,7 +486,19 @@ export { useFile } from "./context/file"
 
 **冲突应对**：上游若重构这些组件路径或导出名，每次同步上游后需同步更新此处。冲突解决比 file-tree.tsx 更直接（改路径而非合并逻辑）。
 
-### 5.3 根 `.gitignore`
+### 5.3 packages/app/src/custom-elements.d.ts 与 packages/enterprise/src/custom-elements.d.ts
+
+这两个文件在上游均被存为单行相对路径 `../../ui/src/custom-elements.d.ts`，原意应该是 symlink，但在 Windows checkout 时退化为纯文本，导致 `bun typecheck` 报 TS1128 解析错误，并被 husky pre-push hook 拦下，无法 push 任何改动。
+
+修复方法：把单行内容改为 TypeScript 合法的 triple-slash reference：
+
+```ts
+/// <reference path="../../ui/src/custom-elements.d.ts" />
+```
+
+这样 Linux/Mac 上 symlink 不生效时也能正确解析。上游若把 symlink 修复了，可以保留我们的版本（语义等价）；若上游做其它改动，按上游为准。
+
+### 5.4 根 `.gitignore`
 
 ```
 .superpowers/
@@ -494,7 +506,7 @@ export { useFile } from "./context/file"
 
 （已添加）
 
-**这三处之外，packages/* 一律不动**。
+**这四处之外，packages/* 一律不动**。
 
 ---
 
