@@ -469,7 +469,7 @@ nodes = nodes.filter((n) => !n.name.startsWith("."))
 `@opencode-ai/app` 当前只 re-export `AppBaseProviders`、`AppInterface` 等顶层组件，未暴露 SessionPage 内部 region。yejian 要复用这些 region 必须先把它们 export 出来：
 
 ```ts
-// 在 packages/app/src/index.ts 末尾追加（约 9 行）
+// 在 packages/app/src/index.ts 末尾追加（约 10 行）
 export { MessageTimeline } from "./pages/session/message-timeline"
 export {
   SessionComposerRegion,
@@ -482,6 +482,7 @@ export { TerminalPanel } from "./pages/session/terminal-panel"
 export { useSDK } from "./context/sdk"
 export { useSync } from "./context/sync"
 export { useFile } from "./context/file"
+export { usePrompt } from "./context/prompt" // Task 7 后续追加：SessionPage 桥接 PanelOne pendingPrompt 需要写入 Composer
 ```
 
 **冲突应对**：上游若重构这些组件路径或导出名，每次同步上游后需同步更新此处。冲突解决比 file-tree.tsx 更直接（改路径而非合并逻辑）。

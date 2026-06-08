@@ -36,6 +36,7 @@ export { TerminalPanel } from "./pages/session/terminal-panel"
 export { useSDK } from "./context/sdk"
 export { useSync } from "./context/sync"
 export { useFile } from "./context/file"
+export { usePrompt } from "./context/prompt"
 
 // Intermediate context providers required by external apps that wire their own routes
 export { ServerProvider } from "./context/server"
