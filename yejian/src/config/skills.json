@@ -1,0 +1,202 @@
+{
+  "groups": [
+    {
+      "id": "office",
+      "name": "日常办公",
+      "skills": [
+        { "id": "generate-ppt", "name": "生成PPT", "placeholder": true },
+        {
+          "id": "pdf-to-md",
+          "name": "PDF转MD",
+          "invokeName": "online-to-md",
+          "prompt": "调用技能 online-to-md，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "将在线 PDF 文档转换为 Markdown 格式，方便编辑和引用。",
+            "keywords": ["PDF", "online-to-md", "Markdown"],
+            "example": "把 https://example.com/paper.pdf 转成 Markdown"
+          }
+        },
+        { "id": "generate-prompt", "name": "生成提示词", "placeholder": true },
+        { "id": "meeting-minutes", "name": "会议纪要", "placeholder": true },
+        { "id": "company-policy-query", "name": "公司制度查询", "placeholder": true },
+        { "id": "policy-data-update", "name": "制度数据更新", "placeholder": true }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "审查相关",
+      "skills": [
+        {
+          "id": "green-building-review",
+          "name": "绿建审查",
+          "invokeName": "Green-Building-Design-Review",
+          "prompt": "调用技能 Green-Building-Design-Review，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "对绿色建筑设计进行专项审查，依据现行绿建国标。",
+            "keywords": ["绿建", "Green-Building", "绿色建筑"],
+            "example": "审查 D:/项目/绿建说明.pdf"
+          }
+        },
+        { "id": "energy-review", "name": "节能审查", "placeholder": true },
+        { "id": "general-description-review", "name": "总说明审查", "placeholder": true },
+        {
+          "id": "city-system-pdf-download",
+          "name": "市系统下载PDF",
+          "invokeName": "review-drawing-downloader",
+          "prompt": "调用技能 review-drawing-downloader，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "从市审查系统批量下载施工图 PDF 文件。",
+            "keywords": ["市系统", "review-drawing-downloader", "下载PDF"],
+            "example": "下载项目 2024-0156 的全部施工图"
+          }
+        },
+        { "id": "province-system-pdf-download", "name": "省系统下载PDF", "placeholder": true },
+        {
+          "id": "current-spec-numbers",
+          "name": "现行规范编号",
+          "invokeName": "current-spec-numbers",
+          "prompt": "调用技能 current-spec-numbers，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "查询建筑结构相关的现行国家标准、行业规范编号及状态。",
+            "keywords": ["规范编号", "current-spec-numbers", "国标"],
+            "example": "查询现行混凝土结构设计规范编号"
+          }
+        },
+        {
+          "id": "current-atlas",
+          "name": "现行图集",
+          "invokeName": "current-atlas",
+          "prompt": "调用技能 current-atlas，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "查询建筑标准图集的现行版本及替代关系。",
+            "keywords": ["图集", "current-atlas", "标准图"],
+            "example": "查 11G101 图集是否已被替代"
+          }
+        },
+        {
+          "id": "specification-auto-update",
+          "name": "规范图集自更新",
+          "invokeName": "specification-auto-update",
+          "prompt": "调用技能 specification-auto-update，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "自动检测并更新本地规范、图集数据库到最新版本。",
+            "keywords": ["规范更新", "specification-auto-update", "图集更新"],
+            "example": "更新本季度规范和图集数据"
+          }
+        }
+      ]
+    },
+    {
+      "id": "party",
+      "name": "党群文章",
+      "skills": [
+        { "id": "propaganda-draft", "name": "宣传稿撰写", "placeholder": true },
+        { "id": "party-article", "name": "党建文章", "placeholder": true },
+        {
+          "id": "document-format",
+          "name": "公文排版",
+          "invokeName": "document-format",
+          "prompt": "调用技能 document-format，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "对党政公文按国家标准 GB/T 9704 排版。",
+            "keywords": ["公文", "document-format", "排版"],
+            "example": "把这份会议纪要按公文标准排版"
+          }
+        },
+        { "id": "wechat-one-click-publish", "name": "公众号一键发布", "placeholder": true },
+        { "id": "article-polish", "name": "文章润色", "placeholder": true },
+        { "id": "text-expand", "name": "文本扩写", "placeholder": true },
+        { "id": "text-condense", "name": "文本缩写", "placeholder": true },
+        { "id": "text-rewrite", "name": "文本改写", "placeholder": true },
+        { "id": "text-continue", "name": "文本续写", "placeholder": true },
+        { "id": "article-summary", "name": "文章总结", "placeholder": true },
+        { "id": "wechat-data-auto-update", "name": "公众号数据自更新", "placeholder": true }
+      ]
+    },
+    {
+      "id": "business",
+      "name": "经营投标",
+      "skills": [
+        { "id": "commercial-bid", "name": "商务标生成", "placeholder": true },
+        { "id": "technical-bid", "name": "技术标生成", "placeholder": true },
+        { "id": "contract-review", "name": "合同审查", "placeholder": true },
+        { "id": "intelligence-gathering", "name": "刺探情报", "placeholder": true },
+        { "id": "bidding-info", "name": "招标信息", "placeholder": true },
+        { "id": "business-dashboard", "name": "经营数据看板", "placeholder": true }
+      ]
+    },
+    {
+      "id": "finance",
+      "name": "财务相关",
+      "skills": [
+        { "id": "invoice-capture", "name": "票据信息采集", "placeholder": true },
+        { "id": "data-analysis", "name": "数据分析", "placeholder": true },
+        { "id": "spreadsheet-organize", "name": "表格整理", "placeholder": true },
+        { "id": "finance-dashboard", "name": "财务数据看板", "placeholder": true }
+      ]
+    },
+    {
+      "id": "multimodal",
+      "name": "多模态",
+      "skills": [
+        { "id": "text-to-image", "name": "文生图", "placeholder": true },
+        { "id": "image-to-text", "name": "图生文", "placeholder": true },
+        {
+          "id": "text-to-speech",
+          "name": "文本转语音",
+          "invokeName": "edge-tts",
+          "prompt": "调用技能 edge-tts，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "将文本转换为语音输出，支持多种语言和音色。",
+            "keywords": ["语音", "edge-tts", "朗读"],
+            "example": "把这段文章转成语音"
+          }
+        },
+        { "id": "speech-to-text", "name": "语音转文本", "placeholder": true },
+        { "id": "video-production", "name": "视频制作", "placeholder": true },
+        { "id": "video-summary", "name": "视频总结", "placeholder": true }
+      ]
+    },
+    {
+      "id": "misc",
+      "name": "其它",
+      "skills": [
+        {
+          "id": "thought-clarifier",
+          "name": "梳理思路",
+          "invokeName": "thought-clarifier",
+          "prompt": "调用技能 thought-clarifier，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "帮你梳理和整理思路，形成结构化的分析框架。",
+            "keywords": ["思路", "thought-clarifier", "梳理"],
+            "example": "帮我梳理这个项目的技术选型思路"
+          }
+        },
+        {
+          "id": "personal-decision-advisor",
+          "name": "个人决策顾问",
+          "invokeName": "personal-decision-advisor",
+          "prompt": "调用技能 personal-decision-advisor，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "提供个人决策分析，权衡利弊，辅助做出更理性的选择。",
+            "keywords": ["决策", "personal-decision-advisor", "顾问"],
+            "example": "帮我分析是否应该接受这个项目"
+          }
+        },
+        { "id": "hallucination-detect", "name": "幻觉检测", "placeholder": true },
+        { "id": "brainstorming", "name": "头脑风暴", "placeholder": true },
+        {
+          "id": "humanizer",
+          "name": "文章去AI味",
+          "invokeName": "humanizer",
+          "prompt": "调用技能 humanizer，请处理以下内容：\n\n【请在此处填写你的具体需求】",
+          "tooltip": {
+            "detail": "去除文章中的 AI 生成痕迹，使文本更自然、更像人写。",
+            "keywords": ["去AI味", "humanizer", "人性化"],
+            "example": "把这篇公告改得更像人写的"
+          }
+        }
+      ]
+    }
+  ]
+}

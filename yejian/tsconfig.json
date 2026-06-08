@@ -12,7 +12,7 @@
     "noUncheckedIndexedAccess": false,
     "verbatimModuleSyntax": false,
     "skipLibCheck": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "bun"],
     "paths": {
       "@yejian/*": ["./src/*"]
     }
