@@ -9,11 +9,14 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "noEmit": true,
     "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "verbatimModuleSyntax": false,
     "skipLibCheck": true,
     "types": ["vite/client"],
     "paths": {
       "@yejian/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "references": [{ "path": "../packages/app" }]
 }

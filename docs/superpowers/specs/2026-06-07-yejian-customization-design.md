@@ -498,7 +498,18 @@ export { useFile } from "./context/file"
 
 这样 Linux/Mac 上 symlink 不生效时也能正确解析。上游若把 symlink 修复了，可以保留我们的版本（语义等价）；若上游做其它改动，按上游为准。
 
-### 5.4 根 `.gitignore`
+### 5.4 packages/app/src/app.tsx（export 关键字补漏）
+
+opencode 的 `AppInterface` 函数内部引用了多个中间 Provider 组件（`AppShellProviders`、`SessionProviders`、`ConnectionGate`、`ServerKey`），这些组件在源文件中未被 export，不能被外部 import。本次在定义处加 `export` 关键字（不改实现），让 yejian 能自己组装与 AppInterface 相同的 Provider 链。
+
+```ts
+// 以 SessionProviders 为例（实际有 4 处）
+export function SessionProviders(props: ParentProps) { ... }
+```
+
+**冲突应对**：上游若重构这些组件的实现方式（拆文件、改名、直接内联），export 关键字可能不再需要或要挪到新路径。每次 merge 上游后检查这 4 个 export 仍有效。
+
+### 5.5 根 `.gitignore`
 
 ```
 .superpowers/
@@ -506,7 +517,7 @@ export { useFile } from "./context/file"
 
 （已添加）
 
-**这四处之外，packages/* 一律不动**。
+**这五处之外，packages/* 一律不动**。
 
 ---
 

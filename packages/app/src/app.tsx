@@ -108,7 +108,7 @@ function BodyDesignClass() {
   return null
 }
 
-function AppShellProviders(props: ParentProps) {
+export function AppShellProviders(props: ParentProps) {
   return (
     <SettingsProvider>
       <BodyDesignClass />
@@ -129,7 +129,7 @@ function AppShellProviders(props: ParentProps) {
   )
 }
 
-function SessionProviders(props: ParentProps) {
+export function SessionProviders(props: ParentProps) {
   return (
     <TerminalProvider>
       <FileProvider>
@@ -186,7 +186,7 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
   )
 }
 
-function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
+export function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
   const server = useServer()
   const checkServerHealth = useCheckServerHealth()
 
@@ -293,7 +293,7 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   )
 }
 
-function ServerKey(props: ParentProps) {
+export function ServerKey(props: ParentProps) {
   const server = useServer()
   return (
     <Show when={server.key} keyed>
