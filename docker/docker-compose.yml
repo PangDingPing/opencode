@@ -1,0 +1,35 @@
+services:
+  opencode-server:
+    build:
+      context: ./opencode-server
+      args:
+        OPENCODE_VERSION: ${OPENCODE_VERSION}
+    container_name: yejian-opencode
+    restart: unless-stopped
+    volumes:
+      - ${WORKSPACE_PATH}:/workspace
+      - ${DATA_PATH}/root:/root
+      - ${DATA_PATH}/tmp:/tmp
+    expose:
+      - "4096"
+    networks:
+      - internal
+
+  nginx:
+    build: ./nginx
+    container_name: yejian-nginx
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT}:80"
+    volumes:
+      - ../yejian/dist:/usr/share/nginx/html:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - opencode-server
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
