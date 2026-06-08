@@ -11,6 +11,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": false,
     "verbatimModuleSyntax": false,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "types": ["vite/client", "bun"],
     "paths": {
