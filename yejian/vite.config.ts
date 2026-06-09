@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@yejian": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "../packages/app/src"),
     },
   },
   server: {
@@ -22,5 +23,8 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+  },
+  worker: {
+    format: "es",
   },
 })
