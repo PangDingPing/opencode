@@ -1,4 +1,4 @@
-# opencode Docker 镜像构建说明
+﻿# opencode Docker 镜像构建说明
 
 本文档记录从源码构建 opencode Docker 镜像的完整流程，以及过程中遇到的问题和解决方案。
 
@@ -7,7 +7,7 @@
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
 - **宿主机端口**：8088
-- **镜像名称**：`yejian-opencode:v0.0.1`
+- **镜像名称**：`yejian-opencode:v0.0.2`
 - **容器名称**：`yejian-AIworkbench`
 
 ---
@@ -62,7 +62,7 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
 cd D:\ai\opencode
 bun install                          # 安装依赖
 cd packages\opencode
-bun run script/build.ts --skip-embed-web-ui   # 构建所有平台二进制
+bun run script/build.ts                  # 构建所有平台二进制（含 Web UI 嵌入）
 ```
 
 **构建产物**：
@@ -86,7 +86,7 @@ cd D:\ai\opencode
 # 临时禁用 .dockerignore（让它包含 dist/ 目录）
 Move-Item .dockerignore .dockerignore.dockerbuild -Force
 
-docker build -t yejian-opencode:v0.0.1 -f docker\Dockerfile .
+docker build -t yejian-opencode:v0.0.2 -f docker\Dockerfile .
 
 # 恢复 .dockerignore
 Move-Item .dockerignore.dockerbuild .dockerignore -Force
@@ -101,7 +101,7 @@ docker run -d --name yejian-AIworkbench -p 8088:8088 `
   -v "D:\AI\AIworkbench-data/tmp:/tmp" `
   -w /workspace `
   --hostname 0.0.0.0 `
-  yejian-opencode:v0.0.1
+  yejian-opencode:v0.0.2
 ```
 
 **参数说明**：
@@ -248,6 +248,83 @@ COPY packages/opencode/dist/opencode-linux-x64-baseline-musl/bin/opencode /usr/l
 
 ---
 
+### 坑 10：custom-elements.d.ts 引用语法错误（v0.0.2 新增）
+
+**问题现象**：
+```
+@opencode-ai/desktop:typecheck: ../app/src/custom-elements.d.ts(1,1): error TS1128: Declaration or statement expected.
+@opencode-ai/enterprise:typecheck: src/custom-elements.d.ts(1,1): error TS1128: Declaration or statement expected.
+```
+
+**原因**：`packages/app/src/custom-elements.d.ts` 和 `packages/enterprise/src/custom-elements.d.ts` 的内容是单行相对路径字符串：
+```
+../../ui/src/custom-elements.d.ts
+```
+这不是合法 TypeScript 语法。`push` 触发的 pre-push hook 跑 `bun turbo typecheck` 时报 TS1128。
+
+**解决**：改为合法的 `///` 引用指令：
+```
+/// <reference path="../../ui/src/custom-elements.d.ts" />
+```
+
+---
+
+### 坑 11：upstream merge 后 patch 文件失效（v0.0.2 新增）
+
+**问题现象**：
+```
+ENOENT: No such file or directory: failed to apply patches: patches/@ff-labs%2Ffff-bun@0.9.3.patch
+```
+
+**原因**：从 `anomalyco/opencode` 拉取最新 dev 后，upstream 已经把 `patches/` 目录下 10 个 patch 文件删了（包升级到不需要 patch 的版本），但仓库根 `package.json` 里的 `patchedDependencies` 字典还引用这 10 个不存在的文件。
+
+**解决**：从 `package.json` 删掉 10 个失效的 `patchedDependencies` 条目，只保留 `patches/` 目录里实际存在的：
+```json
+"patchedDependencies": {
+  "@modelcontextprotocol/sdk@1.29.0": "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch"
+}
+```
+
+**注意**：执行 `bun install` 时会重新生成 `bun.lock`，需要随同 `package.json` 一起提交。
+
+---
+
+### 坑 12：Windows 上 bun install 的 symlink 权限问题（v0.0.2 新增）
+
+**问题现象**：
+```
+ENOENT: No such file or directory: failed to symlink dependencies for package: <package-name>
+```
+
+**原因**：bun 默认在 Windows 上用符号链接（symlink）创建 `node_modules`，但 Windows 默认不允许普通用户创建 symlink（需要开发者模式或管理员权限）。2350+ 包里 9 个 symlink 失败。
+
+**解决**：用 `bun install --no-symlink` 重新安装（不创建符号链接，慢一点但不需要特殊权限）：
+```powershell
+bun install --no-symlink
+```
+
+**根本性解决**（推荐）：以管理员身份运行 PowerShell 一次执行 `bun install`，或启用 Windows 开发者模式（Settings → Privacy & security → For developers → Developer Mode）。后续每次 `bun install` 就都能正常用 symlink。
+
+---
+
+### 坑 13：Alpine 镜像缺少 xdg-open（v0.0.2 新增）
+
+**问题现象**：
+```
+error: Executable not found in $PATH: "xdg-open"
+```
+
+**原因**：`opencode` 启动时会尝试自动打开浏览器（调用 `xdg-open`），但精简的 Alpine 镜像里没装这个工具。**这只是 opencode CLI 的额外便利功能，不影响 web 服务本身**。
+
+**解决**：忽略这个错误，web 服务已经正常启动并监听 8088 端口。容器仍然可以正常用。
+
+如果想消除这个警告，可以在 `Dockerfile` 的 `apk add` 后面追加 `xdg-utils`：
+```dockerfile
+RUN apk add --no-cache libgcc libstdc++ ripgrep xdg-utils
+```
+
+---
+
 ## 镜像导出与迁移
 
 ### 导出镜像为 tar 文件
@@ -259,10 +336,10 @@ powershell -ExecutionPolicy Bypass -File .\docker\export.ps1
 
 或手动：
 ```powershell
-docker save -o D:\AI\yejian-opencode-v0.0.1.tar yejian-opencode:v0.0.1
+docker save -o D:\AI\yejian-opencode-v0.0.2.tar yejian-opencode:v0.0.2
 ```
 
-**输出文件**：`D:\AI\yejian-opencode-v0.0.1.tar`（约 130MB）
+**输出文件**：`D:\AI\yejian-opencode-v0.0.2.tar`（约 150MB，含 web UI 资源比 v0.0.1 略大）
 
 ### 在其他电脑加载镜像
 
@@ -276,13 +353,13 @@ docker save -o D:\AI\yejian-opencode-v0.0.1.tar yejian-opencode:v0.0.1
 
 2. **加载镜像**：
    ```powershell
-   docker load -i D:\AI\yejian-opencode-v0.0.1.tar
+   docker load -i D:\AI\yejian-opencode-v0.0.2.tar
    ```
 
 3. **验证加载成功**：
    ```powershell
    docker images
-   # 应该能看到 yejian-opencode:v0.0.1
+   # 应该能看到 yejian-opencode:v0.0.2
    ```
 
 4. **启动容器**（同上文第 4 步）
@@ -299,7 +376,7 @@ docker save -o D:\AI\yejian-opencode-v0.0.1.tar yejian-opencode:v0.0.1
 **跨平台重新构建**：
 ```bash
 # 在目标平台使用 buildx
-docker buildx build --platform linux/amd64 -t yejian-opencode:v0.0.1 -f docker/Dockerfile .
+docker buildx build --platform linux/amd64 -t yejian-opencode:v0.0.2 -f docker/Dockerfile .
 ```
 
 ---
@@ -339,12 +416,12 @@ docker rm -f yejian-AIworkbench
 
 ### 删除镜像
 ```powershell
-docker rmi yejian-opencode:v0.0.1
+docker rmi yejian-opencode:v0.0.2
 ```
 
 ### 查看镜像详情
 ```powershell
-docker inspect yejian-opencode:v0.0.1
+docker inspect yejian-opencode:v0.0.2
 ```
 
 ---
@@ -375,4 +452,4 @@ docker/
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
 | v0.0.1 | 2026-06-13 | 首次构建，从源码生成多平台二进制并打包为 Docker 镜像 |
-| v0.0.2 | 2026-06-14 | 嵌入 Web UI，网页端品牌定制：浏览器标签标题改为「广东冶建图审AI工作台」、favicon 指向 LOGO1.ico、「新建会话」页面 wordmark 替换为 ai-workbench.png；alpine 标签固定到 3.21.3 |
+| v0.0.2 | 2026-06-14 | 嵌入 Web UI（去除 `--skip-embed-web-ui`），网页端品牌定制：浏览器标签标题改为「广东冶建图审AI工作台」、favicon 指向 LOGO1.ico、「新建会话」页面 wordmark 替换为 ai-workbench.png；alpine 标签固定到 3.21.3；新增 4 个踩坑记录（坑 10/11/12/13） |
