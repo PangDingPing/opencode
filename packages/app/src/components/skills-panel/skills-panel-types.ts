@@ -1,5 +1,7 @@
 // 技能面板类型定义
 
+export type SkillAction = "prompt" | "url"
+
 export type Skill = {
   /** 技能显示名称 */
   name: string
@@ -13,8 +15,12 @@ export type Skill = {
   keyword: string
   /** 使用案例段（Tooltip 中显示） */
   case: string
-  /** 点击后填入 prompt-input 的预设文字 */
+  /** 点击后填入 prompt-input 的预设文字（action === "prompt" 时使用） */
   prompt: string
+  /** 点击后触发的动作；默认 "prompt"（写入 prompt-input）；"url" 打开新窗口 */
+  action?: SkillAction
+  /** 打开的 URL（action === "url" 时必填） */
+  url?: string
 }
 
 export type SkillGroup = {
