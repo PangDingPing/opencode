@@ -4,6 +4,7 @@ node_modules
 .sst
 .env
 .env.local
+docker/api-keys.env
 .idea
 .vscode
 .codex
