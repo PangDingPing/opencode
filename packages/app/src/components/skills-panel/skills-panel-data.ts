@@ -1,6 +1,6 @@
 import type { SkillsData, Skill, SkillGroup } from "./skills-panel-types"
 
-const SKILLS_JSON_URL = "/yejian/技能.json"
+const SKILLS_JSON_URL = "/yejian/skills.json"
 
 function isSkill(value: unknown): value is Skill {
   if (!value || typeof value !== "object") return false
