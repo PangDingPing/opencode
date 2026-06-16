@@ -11,7 +11,8 @@ param(
     [string]$ImageTag = "v0.0.3",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
-    [string]$EnvFile = ""        # 可选: 传 .env 文件路径, build 完后用 run.ps1 启动时注入
+    [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
+    [switch]$ForceRebuild = $false   # Always rebuild the binary even if dist/ exists
 )
 
 # Get script directory
@@ -37,13 +38,20 @@ try {
     }
     Write-Host "Docker is running" -ForegroundColor Green
 
-    # Build the binary if it doesn't exist
+    # Build the binary if it doesn't exist, or if -ForceRebuild is passed
     # Note: We build all platforms (no --single) so we get Linux x64 binary
     # that can run inside the Linux Docker container
     # We use the baseline-musl variant because Alpine uses musl libc (not glibc)
+    # The binary embeds packages/app's built web UI, so source changes in
+    # packages/app require rebuilding this binary to take effect.
     $binaryPath = "packages/opencode/dist/opencode-linux-x64-baseline-musl/bin/opencode"
-    if (-not (Test-Path $binaryPath)) {
-        Write-Host "[2/4] Binary not found, building from source..." -ForegroundColor Yellow
+    if ($ForceRebuild -or -not (Test-Path $binaryPath)) {
+        if ($ForceRebuild) {
+            Write-Host "[2/4] Force rebuild: removing existing binary..." -ForegroundColor Yellow
+            Remove-Item -Recurse -Force packages\opencode\dist -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "[2/4] Binary not found, building from source..." -ForegroundColor Yellow
+        }
         Write-Host "This may take 15-30 minutes..." -ForegroundColor Yellow
 
         # Ensure workspace dependencies are installed (especially packages/app needed for Web UI embed)

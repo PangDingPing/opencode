@@ -23,6 +23,14 @@ cd D:\ai\opencode
 powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
 ```
 
+> **改了 `packages/app` 里的 web UI 代码**（包括新建/修改了 `packages/app/src/**` 下的文件），必须加 `-ForceRebuild` 强制重建 opencode 二进制（web UI 是嵌入到二进制里的，不重建看不到改动）：
+>
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env" -ForceRebuild
+> ```
+>
+> 不传 `-ForceRebuild` 时，脚本会复用 `packages/opencode/dist/` 里现成的二进制，**不会**自动检测源码是否变更。
+
 ### 单独使用各脚本
 
 | 脚本 | 用途 |
