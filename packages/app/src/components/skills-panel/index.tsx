@@ -5,7 +5,7 @@ import { loadSkillsData } from "./skills-panel-data"
 import { createSkillsPanelState } from "./skills-panel-state"
 import type { Skill, SkillGroup, SkillsPanelState } from "./skills-panel-types"
 
-const SKILLS_PANEL_TAB_IMAGE = "/yejian/技能库.png"
+const SKILLS_PANEL_TAB_IMAGE = "/yejian/skills-panel-icon.png"
 
 function applyPromptToInput(text: string) {
   if (typeof document === "undefined") return
