@@ -9,6 +9,7 @@ import { SDKProvider } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { decode64 } from "@/utils/base64"
 import { Schema } from "effect"
+import { SkillsPanel } from "@/components/skills-panel"
 
 export function DirectoryDataProvider(props: ParentProps<{ directory: string; draftID?: string }>) {
   const location = useLocation()
@@ -81,12 +82,15 @@ export default function Layout(props: ParentProps) {
   })
 
   return (
-    <Show when={resolved()} keyed>
-      {(resolved) => (
-        <SDKProvider directory={resolved}>
-          <DirectoryDataProvider directory={resolved}>{props.children}</DirectoryDataProvider>
-        </SDKProvider>
-      )}
-    </Show>
+    <>
+      <SkillsPanel />
+      <Show when={resolved()} keyed>
+        {(resolved) => (
+          <SDKProvider directory={resolved}>
+            <DirectoryDataProvider directory={resolved}>{props.children}</DirectoryDataProvider>
+          </SDKProvider>
+        )}
+      </Show>
+    </>
   )
 }

@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "daily-office",
+      "name": "日常办公",
+      "skills": [
+        {
+          "name": "生成PPT",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "生成PPT",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 生成PPT 技能，"
+        },
+        {
+          "name": "PDF转MD",
+          "developing": false,
+          "skillId": "online-to-md",
+          "tooltip": "使用 MinerU API 将 PDF / Word / PPT / 图片精准解析为 Markdown 格式，图片保存到同目录 images 文件夹。",
+          "keyword": "/online-to-md <文件路径或URL>",
+          "case": "把 D:/AI/report.pdf 转成 Markdown",
+          "prompt": "请使用 online-to-md 技能，把以下文件转成 Markdown："
+        },
+        {
+          "name": "生成提示词",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "生成提示词",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 生成提示词 技能，"
+        },
+        {
+          "name": "会议纪要",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "会议纪要",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 会议纪要 技能，"
+        },
+        {
+          "name": "公司制度查询",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "公司制度查询",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 公司制度查询 技能，"
+        },
+        {
+          "name": "制度数据更新",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "制度数据更新",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 制度数据更新 技能，"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "审查相关",
+      "skills": [
+        {
+          "name": "绿建审查",
+          "developing": false,
+          "skillId": "Green-Building-Design-Review",
+          "tooltip": "按现行《绿色建筑评价标准》GB/T50378-2019（2024年版）及《广州市绿色建筑设计与审查指南2025版》对项目文件进行绿色建筑审查，输出审查意见。多 Agent 协作架构，优先使用审查实操要点文件确保审查准确性。",
+          "keyword": "/Green-Building-Design-Review <项目文件路径>",
+          "case": "对 D:/Projects/绿色建筑设计方案.pdf 进行绿建审查",
+          "prompt": "请使用 Green-Building-Design-Review 技能，对以下项目文件进行绿色建筑审查："
+        },
+        {
+          "name": "节能审查",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "节能审查",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 节能审查 技能，"
+        },
+        {
+          "name": "总说明审查",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "总说明审查",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 总说明审查 技能，"
+        },
+        {
+          "name": "市系统下载PDF",
+          "developing": false,
+          "skillId": "review-drawing-downloader",
+          "tooltip": "从广州市施工图设计文件审查管理系统自动下载工程图纸。适用于审查师、设计师等需要批量下载审图系统中工程图纸的用户。使用 Python 脚本通过 Selenium 自动化 Chrome 浏览器完成登录、搜索、筛选和下载流程。",
+          "keyword": "/review-drawing-downloader <项目名称>",
+          "case": "从市系统下载 普宁项目 的施工图",
+          "prompt": "请使用 review-drawing-downloader 技能，从市系统下载以下项目的 PDF 图纸："
+        },
+        {
+          "name": "省系统下载PDF",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "省系统下载PDF",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 省系统下载PDF 技能，"
+        },
+        {
+          "name": "现行规范编号",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "现行规范编号",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 现行规范编号 技能，"
+        },
+        {
+          "name": "现行图集",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "现行图集",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 现行图集 技能，"
+        },
+        {
+          "name": "规范图集自更新",
+          "developing": false,
+          "skillId": "specification-auto-update",
+          "tooltip": "自动化搜索未收录的建筑工程规范图集数据并保存到 HTML 文件。当需要搜索新建筑规范/标准或图集数据并保存到结构化 HTML 文件时触发。",
+          "keyword": "/specification-auto-update <规范关键词>",
+          "case": "搜索并更新 建筑节能设计标准 相关规范图集",
+          "prompt": "请使用 specification-auto-update 技能，"
+        }
+      ]
+    },
+    {
+      "id": "party-article",
+      "name": "党群文章",
+      "skills": [
+        {
+          "name": "宣传稿撰写",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "宣传稿撰写",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 宣传稿撰写 技能，"
+        },
+        {
+          "name": "党建文章",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "党建文章",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 党建文章 技能，"
+        },
+        {
+          "name": "公文排版",
+          "developing": false,
+          "skillId": "document-format",
+          "tooltip": "对 Word 文档进行公文格式排版，包括字体、字号、行距、页边距、页眉页脚、标题层级等规范化处理，输出符合党政机关公文格式国家标准（GB/T 9704-2012）的文档。",
+          "keyword": "/document-format <Word文件路径>",
+          "case": "把 D:/草稿/调研报告.docx 按公文格式排版",
+          "prompt": "请使用 document-format 技能，对以下文档进行公文格式排版："
+        },
+        {
+          "name": "公众号一键发布",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "公众号一键发布",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 公众号一键发布 技能，"
+        },
+        {
+          "name": "文章润色",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文章润色",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文章润色 技能，"
+        },
+        {
+          "name": "文本扩写",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文本扩写",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文本扩写 技能，"
+        },
+        {
+          "name": "文本缩写",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文本缩写",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文本缩写 技能，"
+        },
+        {
+          "name": "文本改写",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文本改写",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文本改写 技能，"
+        },
+        {
+          "name": "文本续写",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文本续写",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文本续写 技能，"
+        },
+        {
+          "name": "文章总结",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文章总结",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文章总结 技能，"
+        },
+        {
+          "name": "公众号数据自更新",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "公众号数据自更新",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 公众号数据自更新 技能，"
+        }
+      ]
+    },
+    {
+      "id": "bidding",
+      "name": "经营投标",
+      "skills": [
+        {
+          "name": "商务标生成",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "商务标生成",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 商务标生成 技能，"
+        },
+        {
+          "name": "技术标生成",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "技术标生成",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 技术标生成 技能，"
+        },
+        {
+          "name": "合同审查",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "合同审查",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 合同审查 技能，"
+        },
+        {
+          "name": "刺探情报",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "刺探情报",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 刺探情报 技能，"
+        },
+        {
+          "name": "招标信息",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "招标信息",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 招标信息 技能，"
+        },
+        {
+          "name": "经营数据看板",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "经营数据看板",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 经营数据看板 技能，"
+        }
+      ]
+    },
+    {
+      "id": "finance",
+      "name": "财务相关",
+      "skills": [
+        {
+          "name": "票据信息采集",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "票据信息采集",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 票据信息采集 技能，"
+        },
+        {
+          "name": "数据分析",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "数据分析",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 数据分析 技能，"
+        },
+        {
+          "name": "表格整理",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "表格整理",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 表格整理 技能，"
+        },
+        {
+          "name": "财务数据看板",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "财务数据看板",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 财务数据看板 技能，"
+        }
+      ]
+    },
+    {
+      "id": "multimodal",
+      "name": "多模态",
+      "skills": [
+        {
+          "name": "文生图",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文生图",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文生图 技能，"
+        },
+        {
+          "name": "图生文",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "图生文",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 图生文 技能，"
+        },
+        {
+          "name": "文本转语音",
+          "developing": false,
+          "skillId": "edge-tts",
+          "tooltip": "使用 edge-tts 将文本转换为语音，支持多种中文（普通话/粤语/台湾话）及英文音色，可调节语速、音调、格式（mp3 / pcm / wav）。适合需要语音播报、无障碍、驾驶/烹饪等场景。",
+          "keyword": "/edge-tts <文本内容或文件路径>",
+          "case": "把 公司简介.md 转成 mp3 音频（用云扬声音）",
+          "prompt": "请使用 edge-tts 技能，把以下文本转成语音："
+        },
+        {
+          "name": "语音转文本",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "语音转文本",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 语音转文本 技能，"
+        },
+        {
+          "name": "视频制作",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "视频制作",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 视频制作 技能，"
+        },
+        {
+          "name": "视频总结",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "视频总结",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 视频总结 技能，"
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "name": "其它",
+      "skills": [
+        {
+          "name": "梳理思路",
+          "developing": false,
+          "skillId": "thought-clarifier",
+          "tooltip": "当用户需要理清工作思路、整理任务计划、梳理项目头绪时使用。通过多轮渐进式提问（2-10轮动态决定），从 7 个维度（本质、目标、范围、约束、相关方、风险、时间）全面理解任务，应用第一性原理追问关键假设，待用户确认信息充分后，输出详细工作计划或解决方案。",
+          "keyword": "/thought-clarifier",
+          "case": "帮我梳理一下 投标项目 推进思路",
+          "prompt": "请使用 thought-clarifier 技能，帮我梳理头绪："
+        },
+        {
+          "name": "个人决策顾问",
+          "developing": false,
+          "skillId": "personal-decision-advisor",
+          "tooltip": "当用户面临重大决策、人生选择、职业规划、投资决定、情感抉择或任何需要深度思考的选择时触发。帮助用户从 7 大维度（时间穿透力、目标校准、认知偏误检验、系统影响、概率与赔率、第一性原理、博弈论视角）进行系统性分析，识别认知偏差，输出结构化决策报告。",
+          "keyword": "/personal-decision-advisor",
+          "case": "帮我分析一下要不要接这个低价的合同审查项目",
+          "prompt": "请使用 personal-decision-advisor 技能，帮我分析以下决策："
+        },
+        {
+          "name": "幻觉检测",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "幻觉检测",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 幻觉检测 技能，"
+        },
+        {
+          "name": "头脑风暴",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "头脑风暴",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 头脑风暴 技能，"
+        },
+        {
+          "name": "文章去AI味",
+          "developing": true,
+          "tooltip": "功能开发中",
+          "keyword": "文章去AI味",
+          "case": "功能开发中",
+          "prompt": "[开发中] 请使用 文章去AI味 技能，"
+        }
+      ]
+    }
+  ]
+}

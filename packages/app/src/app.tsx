@@ -54,6 +54,7 @@ import { useCheckServerHealth } from "./utils/server-health"
 const HomeRoute = lazy(() => import("@/pages/home"))
 const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
+const SkillsPanel = lazy(() => import("@/components/skills-panel"))
 
 const SessionRoute = Object.assign(
   () => {
@@ -118,6 +119,7 @@ function ResolvedDraftRoute(props: { draftID: string }) {
             <DraftProviders>
               <NewSession />
             </DraftProviders>
+            <SkillsPanel />
           </DirectoryDataProvider>
         </SDKProvider>
       )}
