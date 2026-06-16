@@ -28,6 +28,19 @@ function applyPromptToInput(text: string) {
   el.dispatchEvent(new InputEvent("input", { bubbles: true }))
 }
 
+function openSkillUrl(url: string) {
+  if (typeof window === "undefined") return
+  window.open(url, "_blank", "noopener,noreferrer")
+}
+
+function runSkillAction(skill: Skill) {
+  if (skill.action === "url" && skill.url) {
+    openSkillUrl(skill.url)
+    return
+  }
+  applyPromptToInput(skill.prompt)
+}
+
 function SkillTooltip(props: { skill: Skill }) {
   return (
     <div>
@@ -135,7 +148,7 @@ export function SkillsPanel() {
     setState("open", false)
   }
   const handlePick = (skill: Skill) => {
-    applyPromptToInput(skill.prompt)
+    runSkillAction(skill)
     close()
   }
 
