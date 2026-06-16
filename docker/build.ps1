@@ -8,9 +8,10 @@
 param(
     [string]$ImageName = "yejian-opencode",
     [string]$ContainerName = "yejian-AIworkbench",
-    [string]$ImageTag = "v0.0.2",
+    [string]$ImageTag = "v0.0.3",
     [int]$HostPort = 8088,
-    [int]$ContainerPort = 8088
+    [int]$ContainerPort = 8088,
+    [string]$EnvFile = ""        # 可选: 传 .env 文件路径, build 完后用 run.ps1 启动时注入
 )
 
 # Get script directory
@@ -127,16 +128,37 @@ try {
     }
 
     # Start container
+    # Note: do NOT use a variable that bundles "--env-file <path>" into one string
+    #       and pass it to docker - PowerShell won't split on spaces, so docker
+    #       will see " --env-file \"path\"" as a single (malformed) image name.
+    #       Use two separate code paths instead.
     Write-Host ""
     Write-Host "=== Starting Container ===" -ForegroundColor Cyan
-    docker run -d --name $ContainerName `
-        -p ${HostPort}:${ContainerPort} `
-        -v "${workbenchDir}:/workspace" `
-        -v "${dataDir}\root:/root" `
-        -v "${dataDir}\tmp:/tmp" `
-        -w /workspace `
-        --hostname 0.0.0.0 `
-        "${ImageName}:${ImageTag}"
+    if ($EnvFile -ne "") {
+        if (-not (Test-Path $EnvFile)) {
+            Write-Host "ERROR: env file not found: $EnvFile" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "Injecting env file: $EnvFile" -ForegroundColor Yellow
+        docker run -d --name $ContainerName `
+            -p "${HostPort}:${ContainerPort}" `
+            -v "${workbenchDir}:/workspace" `
+            -v "${dataDir}\root:/root" `
+            -v "${dataDir}\tmp:/tmp" `
+            -w /workspace `
+            --hostname 0.0.0.0 `
+            --env-file "$EnvFile" `
+            "${ImageName}:${ImageTag}"
+    } else {
+        docker run -d --name $ContainerName `
+            -p "${HostPort}:${ContainerPort}" `
+            -v "${workbenchDir}:/workspace" `
+            -v "${dataDir}\root:/root" `
+            -v "${dataDir}\tmp:/tmp" `
+            -w /workspace `
+            --hostname 0.0.0.0 `
+            "${ImageName}:${ImageTag}"
+    }
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
