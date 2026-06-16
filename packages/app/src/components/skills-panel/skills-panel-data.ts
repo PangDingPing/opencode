@@ -11,7 +11,9 @@ function isSkill(value: unknown): value is Skill {
     typeof v.tooltip === "string" &&
     typeof v.keyword === "string" &&
     typeof v.case === "string" &&
-    typeof v.prompt === "string"
+    typeof v.prompt === "string" &&
+    (v.action === undefined || v.action === "prompt" || v.action === "url") &&
+    (v.url === undefined || typeof v.url === "string")
   )
 }
 
