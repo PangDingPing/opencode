@@ -1,4 +1,4 @@
-﻿# opencode Docker 镜像构建说明
+# opencode Docker 镜像构建说明
 
 本文档记录从源码构建 opencode Docker 镜像的完整流程，以及过程中遇到的问题和解决方案。
 
@@ -7,26 +7,28 @@
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
 - **宿主机端口**：8088
-- **镜像名称**：`yejian-opencode:v0.0.2`
+- **镜像名称**：`yejian-opencode:v0.0.3`
 - **容器名称**：`yejian-AIworkbench`
+- **基础镜像**：`alpine:3.24.1`（v0.0.3 起）
+- **预装运行时**：Node.js 24 LTS + Python 3.14 + pnpm 11 + LibreOffice + poppler + qpdf + uv（详见 [Skill 运行时依赖](#skill-运行时依赖)）
 
 ---
 
 ## 快速开始
 
-### 一键构建并启动
+### 一键构建并启动（含 API key 注入）
 
 ```powershell
 cd D:\ai\opencode
-powershell -ExecutionPolicy Bypass -File .\docker\build.ps1
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
 ```
 
 ### 单独使用各脚本
 
 | 脚本 | 用途 |
 |------|------|
-| `build.ps1` | 构建镜像 + 启动容器 |
-| `run.ps1` | 启动容器（需要镜像已构建） |
+| `build.ps1` | 构建镜像 + 启动容器（可选 `-EnvFile` 注入 API key） |
+| `run.ps1` | 启动容器（需要镜像已构建，可选 `-EnvFile`） |
 | `cleanup.ps1` | 停止并删除容器 |
 | `export.ps1` | 导出镜像为 tar 文件 |
 
@@ -447,9 +449,319 @@ docker/
 
 ---
 
+## Skill 运行时依赖
+
+v0.0.3 起，镜像里一次性装齐了 `D:\AI\AIworkbench\.trae\skills\` 下 docx / pdf / xlsx / edge-tts 四个 skill 所需的全部系统包和 Python/NPM 包，**直接就能在容器内运行**。
+
+### 预装的系统包（apk）
+
+| 包 | 用途 | 关联 skill |
+|---|---|---|
+| `libgcc` `libstdc++` | opencode 二进制运行时 | 全部 |
+| `ripgrep` `xdg-utils` | opencode 内置 | 全部 |
+| `bash` `git` `curl` | 通用工具 / 排查 | 全部 |
+| `nodejs` (24 LTS) `npm` `pnpm` (11) | Node 生态 | docx / pdf / xlsx |
+| `python3` (3.14) `py3-pip` | Python 生态 | docx / pdf / xlsx |
+| `uv` | Python 包管理器（10~100x 比 pip 快） | edge-tts（`uvx edge-tts`）+ Python 包安装 |
+| `libreoffice` | `.doc↔.docx` 转换、docx→pdf、xlsx 公式重算 | docx / xlsx（**必需，~300MB**） |
+| `poppler-utils` `poppler-data` | `pdftoppm` / `pdftotext` / `pdfimages` | docx / pdf |
+| `qpdf` | PDF 合并 / 拆分 / 解密 / 旋转 | pdf |
+
+**没装的系统包**（按需 `docker exec` 进容器手动 `apk add`）：
+
+| 包 | 用途 | 大小 |
+|---|---|---|
+| `tesseract-ocr` + `tesseract-data-chi_sim` / `chi_tra` | 扫描版 PDF 做 OCR | ~100MB |
+| `font-noto-cjk` | PDF 显示中文 | ~50MB |
+| `pdf2image` 依赖（系统 `poppler` 实际已装） | — | — |
+
+### 预装的 Python 包（见 `docker/requirements.txt`）
+
+| 包 | 关联 skill |
+|---|---|
+| `defusedxml` `lxml` | docx / xlsx（XML 解析、schema 校验） |
+| `pypdf` `pdfplumber` `pdf2image` `Pillow` `reportlab` `pypdfium2` `pandas` `numpy` | pdf |
+| `pytesseract` | pdf（按需，tesseract 引擎需要时再装） |
+| `openpyxl` | xlsx |
+
+安装方式：`uv pip install --system --break-system-packages --no-cache -r requirements.txt`（构建时执行一次；`--break-system-packages` 是为了绕过 Python 3.14 的 PEP 668 限制，Docker 镜像里使用完全安全）
+
+### 预装的 NPM 包（全局）
+
+| 包 | 关联 skill |
+|---|---|
+| `docx` | docx skill 创建新文档（`require('docx')`） |
+| `pdf-lib` `pdfjs-dist` | pdf skill（reference.md 中的 JS 用法） |
+
+---
+
+## API key 配置
+
+推荐用 `--env-file` 方式，从宿主机的 `.env` 文件批量注入容器：
+
+### 1. 创建 `api-keys.env`
+
+在 `D:\AI\opencode\docker\` 下新建 `api-keys.env`（**不要提交到 git**）：
+
+```env
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+OPENAI_API_KEY=sk-xxxxx
+OPENCODE_API_KEY=xxxxx
+GOOGLE_API_KEY=xxxxx
+```
+
+### 2. 启动时传入
+
+```powershell
+# build.ps1 一条龙
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+
+# 或者 run.ps1 单独启动
+powershell -ExecutionPolicy Bypass -File .\docker\run.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+```
+
+### 3. 验证
+
+```powershell
+docker exec -it yejian-AIworkbench sh
+echo $ANTHROPIC_API_KEY   # 应该输出 sk-ant-xxxxx
+env | grep -i api          # 列出所有 API 相关环境变量
+```
+
+### 其它方式对比
+
+| 方式 | 优点 | 缺点 |
+|---|---|---|
+| `--env-file`（推荐） | 干净、可版本控制 `.env.example` | 文件不能丢 |
+| `docker run -e K=V` | 单次灵活 | 多个 key 时命令行很长 |
+| Dockerfile 里 `ENV` | 简单 | **key 会进镜像层，不安全** |
+
+---
+
+## 局域网访问配置（v0.0.3 新增）
+
+`localhost:8088` 访问没问题，但**别的机器**用 `http://192.168.x.x:8088` 访问可能连不上 —— 这不是 Docker 构建的问题，是 **Windows 防火墙** 拦截了入站连接。
+
+### 症状
+
+| 入口 | 结果 |
+|---|---|
+| 本机 `http://localhost:8088` | ✓ 能访问 |
+| 同局域网 `http://192.168.x.x:8088` | ✗ 连不上 / 超时 |
+
+### 原因
+
+Docker Desktop on Windows 跑在 WSL2 / Hyper-V 虚拟机里。`docker run -p 8088:8088` 时，Docker Desktop **应当**自动加一条"放行 8088 入站"的 Windows 防火墙规则，但**这一步有时候会失败**（尤其是 `docker load` 镜像启动的容器）。
+
+### 解决：以管理员身份运行 PowerShell，加一条防火墙规则
+
+```powershell
+New-NetFirewallRule -DisplayName "opencode web 8088" `
+  -Direction Inbound `
+  -Protocol TCP `
+  -LocalPort 8088 `
+  -Action Allow `
+  -Profile Any
+```
+
+加完规则后，**别的机器立刻就能访问** `http://192.168.x.x:8088`，不用重启容器。
+
+### 验证步骤
+
+```powershell
+# 1. 容器端口确实在监听
+docker ps
+# 看 PORTS 列是不是 0.0.0.0:8088->8088/tcp
+
+# 2. 容器内是绑了 0.0.0.0
+docker exec -it yejian-AIworkbench sh -c "netstat -tlnp | grep 8088"
+# 应该看到 0.0.0.0:8088，而不是 127.0.0.1:8088
+
+# 3. 同网段另一台机器 ping + 访问
+ping 192.168.x.x
+curl http://192.168.x.x:8088
+```
+
+### 其它可能原因
+
+- Windows 当前网络是"公用网络"（更严格）→ 设置 → 网络 → 改成"专用网络"
+- 第三方杀毒软件（360 / 火绒 / 卡巴斯基）拦截 → 临时退出测试
+- 公司网段有 ACL 限制 → 找网管确认
+
+---
+
 ## 变更记录
 
 | 版本 | 日期 | 变更内容 |
 |------|------|----------|
 | v0.0.1 | 2026-06-13 | 首次构建，从源码生成多平台二进制并打包为 Docker 镜像 |
 | v0.0.2 | 2026-06-14 | 嵌入 Web UI（去除 `--skip-embed-web-ui`），网页端品牌定制：浏览器标签标题改为「广东冶建图审AI工作台」、favicon 指向 LOGO1.ico、「新建会话」页面 wordmark 替换为 ai-workbench.png；alpine 标签固定到 3.21.3；新增 4 个踩坑记录（坑 10/11/12/13） |
+| v0.0.3 | 2026-06-16 | Alpine 升到 3.24.1（拿到 Node 24 LTS / Python 3.14 / pnpm 11）；一次性装齐 docx / pdf / xlsx / edge-tts 四个 skill 所需全部运行时（libreoffice / poppler / qpdf / uv + 12 个 Python 包 + 3 个 NPM 包）；`run.ps1` / `build.ps1` 新增 `-EnvFile` 参数支持 `--env-file` 注入 API key；新增 `requirements.txt`；新增"Skill 运行时依赖"和"局域网访问配置"两节 |
+
+---
+
+## 附录：v0.0.3 Docker 升级开发日志（2026.06.16）
+
+本次修改把 opencode Docker 镜像从 v0.0.2 升级到 v0.0.3，主要解决"Skill 运行时依赖缺失"问题（`D:\AI\AIworkbench\.trae\skills\` 下的 docx / pdf / xlsx / edge-tts 四个 skill 在容器内跑不起来），同时把基础镜像从 Alpine 3.21.3 升到 3.24.1（拿到 Node 24 LTS / Python 3.14 / pnpm 11 等新版运行时），并补上 API key 注入和局域网访问说明。
+
+### 一、前置操作
+
+无（基于 v0.0.2 增量升级，未切换分支，沿用 6-15 的 `update-logo` 分支）。
+
+### 二、修改文件清单
+
+#### 1. `docker/Dockerfile`（重写）
+
+- `FROM alpine:3.21.3` → `FROM alpine:3.24.1`
+- `RUN apk add --no-cache` 一次性装齐（按类别）：
+  - 基础：`libgcc libstdc++ ripgrep xdg-utils`
+  - 工具：`bash git curl ca-certificates`
+  - Node 生态：`nodejs` (24 LTS) `npm` `pnpm` (11)
+  - Python 生态：`python3` (3.14) `py3-pip`
+  - 高速包管理器：`uv`（10~100x 比 pip 快）
+  - LibreOffice 套件（必需，~300MB）
+  - PDF 工具：`poppler-utils` `poppler-data` `qpdf`
+- 新增 `COPY docker/requirements.txt /tmp/requirements.txt` + `uv pip install --system --break-system-packages -r ...`：装 12 个 Python 包
+- 新增 `npm install -g --silent docx pdf-lib pdfjs-dist && npm cache clean --force`：装 3 个全局 NPM 包
+- 新增 `RUN opencode --version && node --version && python3 --version && uv --version` 构建期验证
+
+**关键技巧**：`--break-system-packages` 用于绕过 Python 3.14 启用的 PEP 668 "externally-managed" 标记。Docker 镜像里使用完全安全（一次性构建、容器销毁清零、不存在破坏系统包管理器的风险）。
+
+#### 2. `docker/run.ps1`（重写）
+
+- `param` 新增 `[string]$EnvFile = ""`（可选，传 .env 文件路径，脚本自动用 `--env-file` 注入容器）
+- 把所有中文 `Write-Host` 字符串全部改成纯英文（避开 PowerShell 5.1 GBK 编码坑，见坑 1 / 坑 D）
+- 启动容器拆成 **两个独立 if/else 分支**（带 envFile / 不带 envFile），避免变量内含空格被 PowerShell 当成单个参数（见坑 C）
+
+#### 3. `docker/build.ps1`（改）
+
+- `param` 新增 `[string]$EnvFile = ""`
+- `$ImageTag` 默认值 `v0.0.2` → `v0.0.3`
+- 启动容器部分同步拆成两个 if/else 分支
+- 其它二进制构建逻辑保持不变
+
+#### 4. `docker/readme.md`（改）
+
+- 顶部信息更新到 v0.0.3
+- 新增 "Skill 运行时依赖" 章节（apk 包 / pip 包 / npm 包三张表 + 按需 `apk add` 说明）
+- 新增 "API key 配置" 章节（`--env-file` 推荐 + 其它方式对比）
+- 新增 "局域网访问配置" 章节（症状 / 原因 / `New-NetFirewallRule` 解法 / 其它可能）
+- 末尾 "变更记录" 表加 v0.0.3 行
+
+### 三、新增资源文件
+
+| 文件 | 用途 |
+|---|---|
+| `docker/requirements.txt` | 12 个 Python 包清单，按 skill 分组注释；Dockerfile 用 `uv pip install` 装到系统 site-packages |
+
+### 四、删除资源文件
+
+无。
+
+### 五、启动验证
+
+#### 5.1 镜像构建
+
+```powershell
+cd D:\ai\opencode
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+```
+
+构建各阶段耗时（首次拉取依赖；后续 rebuild 会命中缓存）：
+
+| 阶段 | 耗时 | 说明 |
+|---|---|---|
+| 拉 Alpine 3.24.1 基础镜像 | ~30s | 首次 |
+| `apk add` 装所有系统包 | ~9 分钟 | LibreOffice 占大头（~300MB） |
+| `uv pip install` 12 个 Python 包 | ~9s | uv 极快 |
+| `npm install -g` 3 个 NPM 包 | ~35s | |
+| 最终镜像体积 | ~900MB | 从 v0.0.2 的 ~150MB 增加 ~750MB |
+
+#### 5.2 启动容器
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\docker\run.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+```
+
+#### 5.3 容器内逐项验证
+
+```powershell
+docker exec -it yejian-AIworkbench sh
+
+# 验证各运行时版本
+node --version          # v24.x
+python3 --version       # 3.14.x
+pnpm --version          # 11.x
+uv --version            # uv 0.x
+soffice --version       # LibreOffice 信息
+pdftotext -v 2>&1 | head -1    # poppler 信息
+qpdf --version          # qpdf 信息
+
+# 验证 Python 包（应全部能 import）
+python3 -c "import openpyxl, pypdf, pdfplumber, reportlab, defusedxml, lxml, PIL, pandas, numpy, pypdfium2; print('Python deps OK')"
+
+# 验证 NPM 包（应全部能 require）
+node -e "require('docx'); require('pdf-lib'); require('pdfjs-dist'); console.log('NPM deps OK')"
+
+# 验证 API key 注入
+echo $ANTHROPIC_API_KEY
+env | grep -i API
+```
+
+#### 5.4 浏览器访问
+
+打开 **http://localhost:8088**，应能看到 opencode Web 界面。局域网访问需先执行 `New-NetFirewallRule` 放行 8088（见 readme.md "局域网访问配置" 章节）。
+
+### 六、附注
+
+#### 6.1 本次新增的 4 个坑
+
+| # | 现象 | 原因 | 解决 |
+|---|---|---|---|
+| 坑 A | `error: The interpreter at /usr is externally managed`（uv 拒绝装包） | Alpine 3.24 自带的 Python 3.14 启用了 PEP 668，标记系统 Python 归 apk 管、拒绝 pip/uv 安装 | `uv pip install --break-system-packages`（uv 镜像了 pip 的同名参数） |
+| 坑 B | `Unable to find image 'run:latest' locally`（Docker 把 `run` 当成镜像名） | PowerShell 的 `@array` splatting 与 Docker CLI 配合有问题 | 改回最原始的"反引号续行 + 字面量参数"写法 |
+| 坑 C | `invalid reference format: repository name (library/ --env-file D) must be lowercase` | `$envFileArg = " --env-file \`"$EnvFile\`""` 把"flag + value"塞进一个变量，PowerShell 不会按空格拆分、整体作为一个参数传给 Docker | 把带 envFile / 不带 envFile 拆成两个独立的 if/else 代码分支，每个分支用字面量参数 |
+| 坑 D | `字符串缺少终止符: "`（PowerShell 解析失败） | PowerShell 5.1 按 GBK 解析 .ps1 文件，中文字符被当乱码 | PS1 脚本内所有 `Write-Host` 字符串改用纯英文（中文只放 `#` 注释里） |
+
+#### 6.2 镜像体积增量分布
+
+| 组件 | 大小 | 备注 |
+|---|---|---|
+| LibreOffice | +300MB | 必需（docx 转换 + xlsx 公式重算） |
+| Python 12 包 | +200MB | pypdf / pdfplumber / openpyxl 等 |
+| Python3 + py3-pip | +70MB | 基础 |
+| uv | +50MB | 高速包管理器 |
+| Node 3 包 | +50MB | docx / pdf-lib / pdfjs-dist |
+| nodejs + npm + pnpm | +50MB | 基础 |
+| poppler / poppler-data / qpdf | +15MB | PDF 工具链 |
+| bash / git / curl 等 | +5MB | 通用工具 |
+| **合计** | **~750MB** | v0.0.2 150MB → v0.0.3 ~900MB |
+
+#### 6.3 暂未安装的可选包（按需 `docker exec` 进去手动 `apk add`）
+
+| 包 | 用途 | 大小 |
+|---|---|---|
+| `tesseract-ocr` + `tesseract-data-chi_sim` / `chi_tra` | 扫描版 PDF 做 OCR | ~100MB |
+| `font-noto-cjk` | PDF 显示中文 | ~50MB |
+
+#### 6.4 局域网访问的"防火墙"问题与构建无关
+
+`localhost:8088` 能访问、`192.168.x.x:8088` 不行，是 Windows 防火墙拦截（`docker run -p` 时 Docker Desktop 有时不会自动加防火墙规则），不是镜像本身的问题。详见 readme.md "局域网访问配置" 章节里的 `New-NetFirewallRule` 解法。
+
+#### 6.5 typecheck / lint
+
+本次仅修改 `docker/` 目录下的 shell / markdown / Dockerfile，未触及 `packages/*` 任何 TypeScript / TSX 代码，无需跑 `bun typecheck`。
+
+### 七、提交列表
+
+**本次改动尚未 git commit**。计划按"代码基础 → 数据 → 应用"顺序拆 5 个 commit（沿用 6-15 起的 `update-logo` 分支）：
+
+| # | 待提交文件 | 提交类型 | 标题（草稿） |
+|---|---|---|---|
+| 1 | `docker/Dockerfile` | `feat(docker)` | `feat(docker): upgrade to alpine 3.24.1 with full skill runtime` |
+| 2 | `docker/requirements.txt` | `feat(docker)` | `feat(docker): add Python deps for docx/pdf/xlsx skills` |
+| 3 | `docker/run.ps1` | `feat(docker)` | `feat(docker): add -EnvFile param for API key injection` |
+| 4 | `docker/build.ps1` | `chore(docker)` | `chore(docker): bump default tag to v0.0.3` |
+| 5 | `docker/readme.md` | `docs(docker)` | `docs(docker): document v0.0.3 changes, skills deps, firewall` |
+
+每个 commit 独立可构建、可回滚。等用户确认后再执行 `git add / commit`（不主动 push）。
