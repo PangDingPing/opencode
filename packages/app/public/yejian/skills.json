@@ -133,9 +133,9 @@
           "name": "现行规范数据",
           "developing": false,
           "action": "url",
-          "url": "/YEJIAN/现行规范数据2026-02-04.html",
+          "url": "/yejian/%E7%8E%B0%E8%A1%8C%E8%A7%84%E8%8C%83%E6%95%B0%E6%8D%AE2026-02-04.html",
           "tooltip": "新建窗口打开《现行规范数据》页面（2026-02-04 版），查看当前有效的国家/行业/地方建筑工程规范清单。",
-          "keyword": "/YEJIAN/现行规范数据2026-02-04.html",
+          "keyword": "现行规范数据",
           "case": "点击直接跳转",
           "prompt": ""
         },
@@ -143,9 +143,9 @@
           "name": "现行图集数据",
           "developing": false,
           "action": "url",
-          "url": "/YEJIAN/最新图集数据20260206.html",
+          "url": "/yejian/%E6%9C%80%E6%96%B0%E5%9B%BE%E9%9B%86%E6%95%B0%E6%8D%AE20260206.html",
           "tooltip": "新建窗口打开《最新图集数据》页面（2026-02-06 版），查看当前有效的国家/地方建筑标准图集清单。",
-          "keyword": "/YEJIAN/最新图集数据20260206.html",
+          "keyword": "现行图集数据",
           "case": "点击直接跳转",
           "prompt": ""
         },
