@@ -1337,7 +1337,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
-    return "请输入交互内容。提示：/ 调用技能；ctrl+\\ 显示文件树"
+    return "请输入交互内容。提示：Ctrl + \\ ：显示文件树；  Shift + Enter：换行。"
   }
 
   const modelControlState = createMemo<ComposerModelControlState>(() => ({
