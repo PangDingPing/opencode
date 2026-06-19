@@ -108,7 +108,7 @@ const defaultSettings: Settings = {
     autoSave: true,
     releaseNotes: true,
     followup: "steer",
-    showFileTree: false,
+    showFileTree: true,
     showNavigation: false,
     showSearch: false,
     showStatus: false,
@@ -117,7 +117,7 @@ const defaultSettings: Settings = {
     shellToolPartsExpanded: false,
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
-    showCustomAgents: false,
+    showCustomAgents: true,
   },
   appearance: {
     fontSize: 14,
