@@ -325,9 +325,11 @@ export default function FileTree(props: {
   )
 
   const nodes = createMemo(() => {
-    const nodes = file.tree.children(props.path)
+    const raw = file.tree.children(props.path)
     const current = filter()
-    if (!current) return nodes
+    // "所有文件"模式：默认隐藏以 "." 开头的文件/文件夹（如 .git、.vscode、.env 等）
+    if (!current) return raw.filter((node) => !node.name.startsWith("."))
+    const nodes = raw
 
     const parent = (path: string) => {
       const idx = path.lastIndexOf("/")
