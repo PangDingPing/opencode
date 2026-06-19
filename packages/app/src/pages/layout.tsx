@@ -158,7 +158,7 @@ export default function Layout(props: ParentProps) {
   const currentDir = createMemo(() => route().dir)
 
   const [state, setState] = createStore({
-    autoselect: !initialDirectory && !newDesign(),
+    autoselect: !initialDirectory,
     busyWorkspaces: {} as Record<string, boolean>,
     hoverProject: undefined as string | undefined,
     scrollSessionKey: undefined as string | undefined,
@@ -556,8 +556,7 @@ export default function Layout(props: ParentProps) {
     const last = server.projects.last()
 
     if (list.length === 0) {
-      if (!last) return
-      await openProject(last, true)
+      await openProject(last ?? "/YEJIAN", true)
     } else {
       const next = list.find((project) => project.worktree === last) ?? list[0]
       if (!next) return
