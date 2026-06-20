@@ -173,3 +173,15 @@
   color: #93c5fd;
   font-family: var(--font-mono, monospace);
 }
+
+.skills-tooltip-case-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style-type: disc;
+  color: #ffffff;
+}
+
+.skills-tooltip-case-list li {
+  margin: 2px 0;
+  line-height: 1.5;
+}

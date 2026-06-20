@@ -58,7 +58,14 @@ function SkillTooltip(props: { skill: Skill }) {
       <Show when={props.skill.case}>
         <div class="skills-tooltip-row">
           <span class="skills-tooltip-label">使用案例：</span>
-          {props.skill.case}
+          <Show
+            when={Array.isArray(props.skill.case)}
+            fallback={<span>{props.skill.case as string}</span>}
+          >
+            <ul class="skills-tooltip-case-list">
+              <For each={props.skill.case as string[]}>{(c) => <li>{c}</li>}</For>
+            </ul>
+          </Show>
         </div>
       </Show>
     </div>

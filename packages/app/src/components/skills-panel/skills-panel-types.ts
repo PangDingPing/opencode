@@ -13,8 +13,8 @@ export type Skill = {
   tooltip: string
   /** 调用关键词段（Tooltip 中显示） */
   keyword: string
-  /** 使用案例段（Tooltip 中显示） */
-  case: string
+  /** 使用案例段（Tooltip 中显示），支持字符串或字符串数组 */
+  case: string | string[]
   /** 点击后填入 prompt-input 的预设文字（action === "prompt" 时使用） */
   prompt: string
   /** 点击后触发的动作；默认 "prompt"（写入 prompt-input）；"url" 打开新窗口 */

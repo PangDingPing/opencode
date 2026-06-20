@@ -10,7 +10,8 @@ function isSkill(value: unknown): value is Skill {
     typeof v.developing === "boolean" &&
     typeof v.tooltip === "string" &&
     typeof v.keyword === "string" &&
-    typeof v.case === "string" &&
+    (typeof v.case === "string" ||
+      (Array.isArray(v.case) && v.case.every((c) => typeof c === "string"))) &&
     typeof v.prompt === "string" &&
     (v.action === undefined || v.action === "prompt" || v.action === "url") &&
     (v.url === undefined || typeof v.url === "string")
