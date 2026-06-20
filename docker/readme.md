@@ -335,6 +335,41 @@ RUN apk add --no-cache libgcc libstdc++ ripgrep xdg-utils
 
 ---
 
+### 坑 14：Windows 系统层面禁止 bind 8088 端口（v0.0.5 新增）
+
+**问题现象**：`docker run -p 8088:8088 ...` 报：
+```
+ports are not available: exposing port TCP 0.0.0.0:8088 -> 127.0.0.1:0:
+listen tcp 0.0.0.0:8088: bind: An attempt was made to access a socket
+in a way forbidden by its access permissions.
+```
+
+**根因诊断**（按排除法逐项检查）：
+| 检查项 | 命令 | 结果 |
+|---|---|---|
+| 单端口占用 | `netstat -ano -p TCP \| findstr 8088` | 找不到 8088 |
+| PowerShell 连接状态 | `Get-NetTCPConnection -LocalPort 8088` | 空 |
+| Windows 端口排除 | `netsh interface ipv4 show excludedportrange protocol=tcp` | 排除段是 3336/4113-4212/4411-4510/4511-4610/7681-7780/8044-8143/9340-9439/50000-50059/50248，**不包含 8088** |
+| Docker daemon | `docker run -P`（自动分配端口） | 成功（如 0.0.0.0:32768→8088） |
+| **系统底层 bind** | `python -c "import socket; socket.socket().bind(('0.0.0.0', 8088))"` | ❌ **WinError 10013 (WSAEACCES)** |
+| 其它端口 | bind 9000/12345 | ✅ 正常 |
+
+**结论**：不是单个进程占用，不是 Docker daemon 问题，不是端口排除范围；是 **Windows 系统内核层面拒绝 bind 8088 端口**（同理 8089，但 9000/12345 等端口正常）。**未完全定位到具体是哪个底层服务**（可能是 Trae IDE 沙箱、Defender 实时保护、或某个后台服务持续锁定 8088 socket）。
+
+**解决（推荐）**：**重启电脑**即可恢复 8088 端口的 bind 能力。重启后无需任何额外操作。
+
+**临时绕过**：把主机端口改用 9090（容器端口 8088 不变）：
+```powershell
+docker run -d --name yejian-AIworkbench -p 9090:8088 ... yejian-opencode:v0.0.5
+```
+然后访问 `http://localhost:9090`。
+
+**预防**：
+- 如果你长期不用 8088 端口（如切换到 9090），建议把 `build.ps1` / `run.ps1` 的默认端口也改一下（`param([int]$HostPort = 8088)` → `9090`）
+- 但本项目仍按 8088 标准端口来——8088 一直是 opencode 约定的端口，重启恢复后保持一致
+
+---
+
 ## 镜像导出与迁移
 
 ### 导出镜像为 tar 文件
@@ -605,6 +640,7 @@ curl http://192.168.x.x:8088
 | v0.0.1 | 2026-06-13 | 首次构建，从源码生成多平台二进制并打包为 Docker 镜像 |
 | v0.0.2 | 2026-06-14 | 嵌入 Web UI（去除 `--skip-embed-web-ui`），网页端品牌定制：浏览器标签标题改为「广东冶建图审AI工作台」、favicon 指向 LOGO1.ico、「新建会话」页面 wordmark 替换为 ai-workbench.png；alpine 标签固定到 3.21.3；新增 4 个踩坑记录（坑 10/11/12/13） |
 | v0.0.3 | 2026-06-16 | Alpine 升到 3.24.1（拿到 Node 24 LTS / Python 3.14 / pnpm 11）；一次性装齐 docx / pdf / xlsx / edge-tts 四个 skill 所需全部运行时（libreoffice / poppler / qpdf / uv + 12 个 Python 包 + 3 个 NPM 包）；`run.ps1` / `build.ps1` 新增 `-EnvFile` 参数支持 `--env-file` 注入 API key；新增 `requirements.txt`；新增"Skill 运行时依赖"和"局域网访问配置"两节 |
+| v0.0.5 | 2026-06-20 | Skill 四角互补重构：新增"决策系统（军师）★★"分组，整合 4 个思考类 skill（头脑风暴 / 梳理头绪 / 决策顾问 / 智囊评审）；前端 `case` 字段从 string 升级为 `string \| string[]` 支持多 case 列表展示；Word 技能 case 拆为 3 元素数组；公文排版 keyword 由命令式 `/document-format` 改为描述性中文短语；`其它`分组删除 3 个旧条目（梳理思路 / 个人决策顾问 / 头脑风暴）。**注意**：本版本构建期间发现 8088 端口被系统层面禁止 bind（WinError 10013），**重启电脑可恢复**——见坑 14 |
 
 ---
 
@@ -773,3 +809,149 @@ env | grep -i API
 | 5 | `docker/readme.md` | `docs(docker)` | `docs(docker): document v0.0.3 changes, skills deps, firewall` |
 
 每个 commit 独立可构建、可回滚。等用户确认后再执行 `git add / commit`（不主动 push）。
+
+---
+
+## 附录：v0.0.5 Skill 四角互补重构 + 实际启动命令（2026.06.20）
+
+本次改动合并两个独立事项：(A) **Skill 体系四角互补重构**（前端 4 文件 + skills.json 1 文件）整合 4 个思考类 skill 为"决策系统（军师）★★"分组；(B) **用户实际 docker run 命令与 build.ps1/run.ps1 默认值不一致**，本次以用户实际命令为准记录在案。
+
+### A. Skill 四角互补重构
+
+#### A.1 需求背景
+
+按 `E:\AI\YEJIAN\.开发文档\260620-skill四角互补重构计划-v3.md`，将 4 个思考类 skill（头脑风暴 / 梳理头绪 / 决策顾问 / 智囊评审）整合为"发散 → 澄清 → 决断 → 把关"四角互补工作流，在悬浮技能框中以"决策系统（军师）★★"分组集中展示，并删除其它分组下的旧/重复条目。
+
+附带需求：
+- `case` 字段从单字符串扩展为支持多 case 数组（让用户能看到更多示例）
+- 公文排版 keyword 从命令式 `/document-format <Word文件路径>` 改为描述性中文短语
+- 现有 Word 技能的 3 个 case（原本用 `；` 拼接为单字符串）拆为数组
+
+#### A.2 修改文件清单
+
+##### A.2.1 `packages/app/src/components/skills-panel/skills-panel-types.ts`
+
+- L16-17：`case: string` → `case: string | string[]`，注释加"支持字符串或字符串数组"
+
+##### A.2.2 `packages/app/src/components/skills-panel/skills-panel-data.ts`
+
+- L13-14：`isSkill` 验证条件改为：
+  ```ts
+  (typeof v.case === "string" ||
+    (Array.isArray(v.case) && v.case.every((c) => typeof c === "string")))
+  ```
+
+##### A.2.3 `packages/app/src/components/skills-panel/index.tsx`
+
+- L58-70：case 渲染从 `{props.skill.case}` 改为三元判断
+  - 字符串：用 `<span>` 直接展示（保持原行为）
+  - 数组：渲染为 `<ul class="skills-tooltip-case-list">` 多行
+
+##### A.2.4 `packages/app/src/components/skills-panel/skills-panel.css`
+
+- 新增 `.skills-tooltip-case-list` 和 `.skills-tooltip-case-list li` 样式（list-style-type: disc，行高 1.5）
+
+##### A.2.5 `packages/app/public/yejian/skills.json`
+
+**新增"决策系统（军师）★★"分组（groups[0]）**：
+
+| Skill | skillId | case 数量 | 工作流阶段 |
+|---|---|---|---|
+| 头脑风暴 | brainstorming | 5 | 发散 |
+| 梳理头绪 | thought-clarifier | 5 | 澄清 |
+| 决策顾问 | decision-advisor | 4 | 决断 |
+| 智囊评审 | brain-trust-review | 5 | 把关 |
+
+**"其它"分组删除 3 个旧条目**（梳理思路 / 个人决策顾问 / 头脑风暴）；保留 幻觉检测、文章去AI味。
+
+**Word 技能 case 拆为数组**（groups[1].skills[1]）：
+```json
+"case": [
+  "请将以下文字内容转成 Word",
+  "按【模板】将内容转换为精美的成品 Word 文档",
+  "【Word 文件】插入页码"
+]
+```
+
+**公文排版 keyword 改方案 A**（groups[2].skills[2]）：`/document-format <Word文件路径>` → `公文排版、Word 排版、公文格式、党政机关公文格式`
+
+#### A.3 踩坑记录（前端 / JSON）
+
+1. **JSON 中 ASCII 直引号导致解析失败**：3 个 tooltip 行（line 12/27/56）value 中用了 ASCII `"`（0x22）包裹触发词，导致 `SyntaxError: Expected ',' or '}' after property value in JSON at position 262 (line 12 column 43)`。修复：Python 脚本批量替换为中文 `"`/`"`（U+201C / U+201D）。**教训：编辑 JSON 时字符串内用中文引号或转义，避免裸 ASCII 引号**。
+
+2. **前端 `isSkill` 验证不接受数组**：`isSkill` 原本只接受 `typeof v.case === "string"`，直接改 JSON 不动前端会触发"技能 JSON 结构校验失败"。**必须前端 + JSON 同步改**。
+
+3. **`<For>` 已在顶部 import**：SolidJS `<For>` 组件已存在于文件顶部 import，不需要新增 import。
+
+#### A.4 验证
+
+1. **类型检查**（可选）：`cd packages/app && bun typecheck`
+2. **JSON 合法性**：`python -c "import json; json.load(open('packages/app/public/yejian/skills.json', encoding='utf-8'))"`
+3. **浏览器 dev 模式**：访问 `http://localhost:4444`（前端 dev 端口），强制刷新（Ctrl+Shift+R）清缓存。
+4. **关键检查点**：
+   - "决策系统（军师）★★"分组在第 1 个位置
+   - 4 个 skill 名称：头脑风暴 / 梳理头绪 / 决策顾问 / 智囊评审
+   - case 列表显示为**项目符号**（不是挤在一行）
+   - Word 技能 case 3 条、公文排版 keyword 是新描述
+   - "其它"分组下：只剩 幻觉检测、文章去AI味
+
+#### A.5 提交（按依赖顺序 4 个 commit）
+
+| # | hash | 提交信息 | 文件 |
+|---|---|---|---|
+| 1 | `51d50b6e2` | `feat(skills-panel): support array case for multi-example display` | types.ts + data.ts + index.tsx + css |
+| 2 | `d7e20c523` | `feat(skills): add decision-system group for 4-corner workflow` | skills.json（核心：新增决策系统分组 + 其它分组清理 + Word case 拆 + keyword 改） |
+| 3 | `9fc94b13b` | `docs(日志): append 6-20 skill four-corner refactor entry` | 日志.md |
+| 4 | `6971f5ccd` | `docs(日志): add 6-20 four-corner skill refactor detailed log` | 日志/20260620开发日志-skill四角互补重构.md |
+
+详细开发日志：`日志/20260620开发日志-skill四角互补重构.md`
+
+---
+
+### B. 实际 docker run 命令（用户最终使用）
+
+**用户当前启动 v0.0.5 容器的命令**（与 `build.ps1` / `run.ps1` 默认值不同）：
+
+```powershell
+docker run -d --name yejian-AIworkbench -p 8088:8088 `
+  -v "E:\AI\YEJIAN:/YEJIAN" `
+  -v "E:\AI\AIworkbench-data/root:/root" `
+  -v "E:\AI\AIworkbench-data/tmp:/tmp" `
+  -w /YEJIAN `
+  --env-file "E:\AI\dockerimage\api-keys.env" `
+  --restart always `
+  --hostname 0.0.0.0 `
+  yejian-opencode:v0.0.5
+```
+
+#### B.1 与 `build.ps1` / `run.ps1` 默认值的差异
+
+| 参数 | build.ps1 / run.ps1 默认 | 用户实际 | 原因 |
+|---|---|---|---|
+| `-p` | `127.0.0.1:8088:8080`（build.ps1）<br>`${HostPort}:${ContainerPort}`（run.ps1） | `8088:8088`（0.0.0.0） | 用户希望局域网能访问（绑定所有网卡） |
+| `-v` 工作目录 | `D:\AI\AIworkbench:/workspace` | `E:\AI\YEJIAN:/YEJIAN` | 用户在 YEJIAN 项目下用 opencode，需要挂载 YEJIAN |
+| `-v` `/root` | `D:\AI\AIworkbench-data/root:/root` | `E:\AI\AIworkbench-data/root:/root` | 容器 root 数据放 AIworkbench-data |
+| `-v` `/tmp` | `D:\AI\AIworkbench-data/tmp:/tmp` | `E:\AI\AIworkbench-data/tmp:/tmp` | 一致 |
+| `-w` | `/workspace` | `/YEJIAN` | 配合工作目录 |
+| `--env-file` | 可选 `D:\AI\opencode\docker\api-keys.env` | `E:\AI\dockerimage\api-keys.env` | 用户把 API key 文件统一放在 dockerimage 目录 |
+| `--restart` | 无 | `always` | 用户希望容器随 docker daemon 自动重启 |
+| `--hostname` | `0.0.0.0` | `0.0.0.0` | 一致 |
+
+#### B.2 注意事项
+
+1. **环境变量 API key 文件路径变化**：`D:\AI\opencode\docker\api-keys.env` → `E:\AI\dockerimage\api-keys.env`，如果 `build.ps1` 仍在用旧路径会注入失败。
+2. **工作目录变化**：容器默认工作目录 `/YEJIAN`（不是 `/workspace`），如果 skill 脚本里用相对路径需要注意。
+3. **端口 8088 临时不可用**（v0.0.5 构建期间发现，见坑 14）：如果遇到 WinError 10013，**重启电脑**即可恢复；临时可改 `9090:8088` 绕过。
+
+#### B.3 验证结果
+
+- HTTP 探活 `http://localhost:9090` 返回 200（v0.0.5 构建期间用 9090 临时绕过）
+- 容器内 opencode 监听 8088（容器内端口不变）
+- 容器名 `yejian-AIworkbench` 与 build.ps1 默认一致
+- API key 文件 `E:\AI\dockerimage\api-keys.env` 注入成功（容器内 `env | grep -i API` 可查）
+
+#### B.4 后续建议
+
+- 把 `E:\AI\dockerimage\api-keys.env` 路径固化到 `build.ps1` 的注释里（或加一个 `api-keys.env` 默认路径配置）
+- 把 `E:\AI\YEJIAN:/YEJIAN` 工作目录挂载也固化到脚本（避免每次手动写）
+- 但**这些不影响构建流程**——本次 build.ps1 的 binary + image 构建都成功了，只是容器启动用的是用户手动命令
