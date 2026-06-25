@@ -21,7 +21,8 @@ import {
 
 import { NamedError } from "@opencode-ai/core/util/error"
 import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
-import { Database } from "@opencode-ai/core/database/database"
+import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
+import { Service as DatabaseService } from "@opencode-ai/core/database/database"
 import { NotFoundError } from "@/storage/storage"
 import { and } from "drizzle-orm"
 import { desc } from "drizzle-orm"
@@ -106,7 +107,7 @@ const part = (row: typeof PartTable.$inferSelect) =>
 const older = (row: Cursor) =>
   or(lt(MessageTable.time_created, row.time), and(eq(MessageTable.time_created, row.time), lt(MessageTable.id, row.id)))
 
-function hydrate(db: Database.Interface["db"], rows: (typeof MessageTable.$inferSelect)[]) {
+function hydrate(db: DatabaseInterface["db"], rows: (typeof MessageTable.$inferSelect)[]) {
   const ids = rows.map((row) => row.id)
   const partByMessage = new Map<string, Part[]>()
   return Effect.gen(function* () {
@@ -438,7 +439,7 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
   limit: number
   before?: string
 }) {
-  const { db } = yield* Database.Service
+  const { db } = yield* DatabaseService
   const before = input.before ? cursor.decode(input.before) : undefined
   const where = before
     ? and(eq(MessageTable.session_id, input.sessionID), older(before))
@@ -502,7 +503,7 @@ export function stream(sessionID: SessionID) {
 
 export function parts(messageID: MessageID) {
   return Effect.gen(function* () {
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
     const rows = yield* db
       .select()
       .from(PartTable)
@@ -515,10 +516,10 @@ export function parts(messageID: MessageID) {
 }
 
 export const get = Effect.fn("MessageV2.get")(function* (input: { sessionID: SessionID; messageID: MessageID }) {
-  const { db } = yield* Database.Service
-  const row = yield* db
-    .select()
-    .from(MessageTable)
+  const { db } = yield* DatabaseService
+    return yield* db
+      .select()
+      .from(MessageTable)
     .where(and(eq(MessageTable.id, input.messageID), eq(MessageTable.session_id, input.sessionID)))
     .get()
     .pipe(Effect.orDie)

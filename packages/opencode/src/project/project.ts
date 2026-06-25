@@ -1,6 +1,10 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { and, eq, sql } from "drizzle-orm"
-import { Database } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { ProjectDirectories } from "@opencode-ai/core/project/directories"
 import { SessionTable } from "@opencode-ai/core/session/sql"
@@ -141,7 +145,7 @@ export const layer = Layer.effect(
     const projectDirectories = yield* ProjectDirectories.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
 
     const git = Effect.fnUntraced(
       function* (args: string[], opts?: { cwd?: string }) {
@@ -499,7 +503,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(AppProcess.defaultLayer),
   Layer.provide(CrossSpawnSpawner.defaultLayer),
   Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Database.defaultLayer),
+  Layer.provide(DatabaseDefaultLayer),
   Layer.provide(RuntimeFlags.defaultLayer),
 )
 
@@ -513,7 +517,7 @@ export const node = LayerNode.make(layer, [
   ProjectDirectories.node,
   EventV2Bridge.node,
   RuntimeFlags.node,
-  Database.node,
+  DatabaseNode,
 ])
 
 export * as Project from "./project"

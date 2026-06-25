@@ -12,7 +12,11 @@ import { Provider } from "@/provider/provider"
 import { Session } from "@/session/session"
 import { MessageV2 } from "@/session/message-v2"
 import type { SessionID } from "@/session/schema"
-import { Database } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
 import { Config } from "@/config/config"
 import { SessionShareTable } from "@opencode-ai/core/share/sql"
@@ -115,7 +119,7 @@ export const layer = Layer.effect(
     const account = yield* Account.Service
     const events = yield* EventV2Bridge.Service
     const cfg = yield* Config.Service
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
     const http = yield* HttpClient.HttpClient
     const httpOk = HttpClient.filterStatusOk(http)
     const provider = yield* Provider.Service
@@ -366,7 +370,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(EventV2Bridge.defaultLayer),
   Layer.provide(Account.defaultLayer),
   Layer.provide(Config.defaultLayer),
-  Layer.provide(Database.defaultLayer),
+  Layer.provide(DatabaseDefaultLayer),
   Layer.provide(FetchHttpClient.layer),
   Layer.provide(Provider.defaultLayer),
   Layer.provide(Session.defaultLayer),
@@ -376,7 +380,7 @@ export const node = LayerNode.make(layer, [
   Account.node,
   EventV2Bridge.node,
   Config.node,
-  Database.node,
+  DatabaseNode,
   httpClient,
   Provider.node,
   Session.node,

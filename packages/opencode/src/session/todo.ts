@@ -1,7 +1,11 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { SessionID } from "./schema"
 import { Effect, Layer, Context, Schema } from "effect"
-import { Database } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
 import { asc } from "drizzle-orm"
 import { TodoTable } from "@opencode-ai/core/session/sql"
@@ -38,7 +42,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const events = yield* EventV2Bridge.Service
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
 
     const update = Effect.fn("Todo.update")(function* (input: { sessionID: SessionID; todos: Info[] }) {
       yield* db
@@ -83,8 +87,8 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(EventV2Bridge.defaultLayer), Layer.provide(Database.defaultLayer))
+export const defaultLayer = layer.pipe(Layer.provide(EventV2Bridge.defaultLayer), Layer.provide(DatabaseDefaultLayer))
 
-export const node = LayerNode.make(layer, [EventV2Bridge.node, Database.node])
+export const node = LayerNode.make(layer, [EventV2Bridge.node, DatabaseNode])
 
 export * as Todo from "./todo"

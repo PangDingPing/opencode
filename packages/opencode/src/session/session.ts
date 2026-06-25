@@ -8,7 +8,12 @@ import { BackgroundJob } from "@/background/job"
 import { Decimal } from "decimal.js"
 import type { ProviderMetadata, Usage } from "@opencode-ai/llm"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { Database } from "@opencode-ai/core/database/database"
+import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
@@ -46,7 +51,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 
-const runtime = makeRuntime(Database.Service, Database.defaultLayer)
+const runtime = makeRuntime(DatabaseService, DatabaseDefaultLayer)
 
 const parentTitlePrefix = "New session - "
 const childTitlePrefix = "Child session - "
@@ -528,12 +533,12 @@ export type Patch = Omit<Partial<Info>, "time" | "share" | "summary" | "revert" 
 export const layer: Layer.Layer<
   Service,
   never,
-  BackgroundJob.Service | RuntimeFlags.Service | Database.Service | EventV2Bridge.Service
+  BackgroundJob.Service | RuntimeFlags.Service | DatabaseService | EventV2Bridge.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const { db } = yield* Database.Service
-    const database = yield* Database.Service
+    const { db } = yield* DatabaseService
+    const database = yield* DatabaseService
     const background = yield* BackgroundJob.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
@@ -857,7 +862,7 @@ export const layer: Layer.Layer<
     const messages: Interface["messages"] = Effect.fn("Session.messages")(function* (input) {
       if (input.limit) {
         return (yield* MessageV2.page({ sessionID: input.sessionID, limit: input.limit }).pipe(
-          Effect.provideService(Database.Service, database),
+          Effect.provideService(DatabaseService, database),
         )).items
       }
 
@@ -866,7 +871,7 @@ export const layer: Layer.Layer<
       let before: string | undefined
       while (true) {
         const page = yield* MessageV2.page({ sessionID: input.sessionID, limit: size, before }).pipe(
-          Effect.provideService(Database.Service, database),
+          Effect.provideService(DatabaseService, database),
         )
         if (page.items.length === 0) break
         for (let i = page.items.length - 1; i >= 0; i--) {
@@ -919,7 +924,7 @@ export const layer: Layer.Layer<
       let before: string | undefined
       while (true) {
         const page = yield* MessageV2.page({ sessionID, limit: size, before }).pipe(
-          Effect.provideService(Database.Service, database),
+          Effect.provideService(DatabaseService, database),
         )
         if (page.items.length === 0) break
         for (let i = page.items.length - 1; i >= 0; i--) {
@@ -965,7 +970,7 @@ export const layer: Layer.Layer<
 
 export const defaultLayer = layer.pipe(
   Layer.provide(BackgroundJob.defaultLayer),
-  Layer.provide(Database.defaultLayer),
+  Layer.provide(DatabaseDefaultLayer),
   Layer.provide(EventV2Bridge.defaultLayer),
   Layer.provide(SessionExecution.noopLayer),
   Layer.provide(SessionV2.defaultLayer),
@@ -990,7 +995,7 @@ const cancelBackgroundJobs = Effect.fn("Session.cancelBackgroundJobs")(function*
 })
 
 function listByProject(
-  db: Database.Interface["db"],
+  db: DatabaseInterface["db"],
   input: ListInput & {
     projectID: ProjectV2.ID
     experimentalWorkspaces: boolean
@@ -1114,6 +1119,6 @@ export function* listGlobal(input?: {
   }
 }
 
-export const node = LayerNode.make(layer, [BackgroundJob.node, RuntimeFlags.node, Database.node, EventV2Bridge.node])
+export const node = LayerNode.make(layer, [BackgroundJob.node, RuntimeFlags.node, DatabaseNode, EventV2Bridge.node])
 
 export * as Session from "./session"
