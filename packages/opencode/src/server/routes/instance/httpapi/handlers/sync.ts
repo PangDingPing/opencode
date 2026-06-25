@@ -1,7 +1,7 @@
 import { Workspace } from "@/control-plane/workspace"
 import * as InstanceState from "@/effect/instance-state"
 import { Session } from "@/session/session"
-import { Database } from "@opencode-ai/core/database/database"
+import { Service as DatabaseService } from "@opencode-ai/core/database/database"
 import { EventV2 } from "@opencode-ai/core/event"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventTable } from "@opencode-ai/core/event/sql"
@@ -22,7 +22,7 @@ export const syncHandlers = HttpApiBuilder.group(InstanceHttpApi, "sync", (handl
     const session = yield* Session.Service
     const scope = yield* Scope.Scope
     const events = yield* EventV2Bridge.Service
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
 
     const start = Effect.fn("SyncHttpApi.start")(function* () {
       yield* workspace

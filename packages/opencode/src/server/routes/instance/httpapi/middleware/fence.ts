@@ -1,14 +1,14 @@
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { Database } from "@opencode-ai/core/database/database"
+import { Service as DatabaseService } from "@opencode-ai/core/database/database"
 import { Effect } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Fence from "@/server/shared/fence"
 
 const ignoredMethods = new Set(["GET", "HEAD", "OPTIONS"])
 
-export const fenceLayer = HttpRouter.middleware<{ requires: Database.Service; handles: unknown }>()(
+export const fenceLayer = HttpRouter.middleware<{ requires: DatabaseService; handles: unknown }>()(
   Effect.gen(function* () {
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
     return (effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest

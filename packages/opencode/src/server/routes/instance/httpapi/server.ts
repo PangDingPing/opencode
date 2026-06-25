@@ -50,6 +50,8 @@ import { Worktree } from "@/worktree"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { Database } from "@opencode-ai/core/database/database"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/layer-node-platform"
 import { EventV2 } from "@opencode-ai/core/event"
@@ -95,6 +97,8 @@ import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
 import { handlers } from "@opencode-ai/server/handlers"
 import { schemaErrorLayer as v2SchemaErrorLayer } from "@opencode-ai/server/middleware/schema-error"
+import { cookieAuthLayer } from "@opencode-ai/server/middleware/auth"
+import { requireAdminLayer } from "@opencode-ai/server/middleware/require-admin"
 import { workspaceHandlers } from "./handlers/workspace"
 import { instanceContextLayer } from "./middleware/instance-context"
 import { workspaceRoutingLayer } from "./middleware/workspace-routing"
@@ -113,6 +117,8 @@ const cors = (corsOptions?: CorsOptions) =>
     HttpMiddleware.cors({
       allowedOrigins: (origin) => isAllowedCorsOrigin(origin, corsOptions),
       maxAge: 86_400,
+      // 多用户 cookie 认证需要跨域携带 cookie，CORS 必须显式允许 credentials
+      credentials: true,
     }),
     { global: true },
   )
@@ -166,7 +172,8 @@ const instanceRoutes = instanceApiRoutes.pipe(
 )
 const serverRoutes = HttpApiBuilder.layer(Api).pipe(
   Layer.provide(handlers),
-  Layer.provide([serverHttpApiAuthLayer, v2SchemaErrorLayer]),
+  Layer.provide([serverHttpApiAuthLayer, cookieAuthLayer, requireAdminLayer, v2SchemaErrorLayer]),
+  Layer.provide(ServerAuth.Config.defaultLayer),
 )
 
 // `OpenApi.fromApi` is non-trivial; defer until /doc is actually hit so
@@ -276,6 +283,9 @@ export function createRoutes(
       cors(corsOptions),
       MoveSession.defaultLayer,
       HttpServer.layerServices,
+      // User/AuthToken layers — need Database dependency
+      Layer.merge(User.defaultLayer, Database.defaultLayer),
+      Layer.merge(AuthToken.defaultLayer, Database.defaultLayer),
     ]),
     Layer.provide(LayerNode.buildLayer(app)),
     Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),

@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { effectCmd } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -14,22 +14,24 @@ import { UserTable } from "@opencode-ai/core/user/sql"
  * - 没有用户且没设 OPENCODE_SERVER_PASSWORD → fail-fast
  * - 没有用户且设了密码 → 创建 admin 账号
  */
-const bootstrapAdmin = Effect.fn("Cli.serve.bootstrapAdmin")(function* () {
-  const { db } = yield* Database.Service
-  const result = yield* db.select({ c: count() }).from(UserTable).get().pipe(Effect.orDie)
-  if (result && result.c > 0) return
+function bootstrapAdmin() {
+  return Effect.gen("Cli.serve.bootstrapAdmin", function* () {
+    const { db } = yield* Database.Service
+    const result = yield* db.select({ c: count() }).from(UserTable).get().pipe(Effect.orDie)
+    if (result && result.c > 0) return
 
-  const password = Flag.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    console.error("首次启动必须设置 OPENCODE_SERVER_PASSWORD 环境变量")
-    process.exit(1)
-  }
+    const password = Flag.OPENCODE_SERVER_PASSWORD
+    if (!password) {
+      console.error("首次启动必须设置 OPENCODE_SERVER_PASSWORD 环境变量")
+      process.exit(1)
+    }
 
-  const username = Flag.OPENCODE_SERVER_USERNAME ?? "admin"
-  const userSvc = yield* User.Service
-  yield* userSvc.createUser({ username, password, role: "admin" })
-  console.log(`已创建初始 admin 账号: ${username}`)
-})
+    const username = Flag.OPENCODE_SERVER_USERNAME ?? "admin"
+    const userSvc = yield* User.Service
+    yield* userSvc.createUser({ username, password, role: "admin" })
+    console.log(`已创建初始 admin 账号: ${username}`)
+  })
+}
 
 export const ServeCommand = effectCmd({
   command: "serve",
@@ -46,10 +48,10 @@ export const ServeCommand = effectCmd({
     }
 
     // 启动引导：确保 admin 账号存在
-    yield* bootstrapAdmin.pipe(
+    yield* bootstrapAdmin().pipe(
       Effect.provide(Database.defaultLayer),
-      Effect.provide(User.defaultLayer),
-      Effect.provide(AuthToken.defaultLayer),
+      Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
+      Effect.provide(Layer.merge(AuthToken.defaultLayer, Database.defaultLayer)),
     )
 
     const opts = yield* resolveNetworkOptions(args)

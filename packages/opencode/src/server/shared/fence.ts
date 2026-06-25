@@ -1,4 +1,4 @@
-import { Database } from "@opencode-ai/core/database/database"
+import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
 import { inArray } from "drizzle-orm"
 import { EventSequenceTable } from "@opencode-ai/core/event/sql"
 import { Workspace } from "@/control-plane/workspace"
@@ -8,7 +8,7 @@ import { Effect } from "effect"
 export const HEADER = "x-opencode-sync"
 export type State = Record<string, number>
 
-export function load(db: Database.Interface["db"], ids?: string[]) {
+export function load(db: DatabaseInterface["db"], ids?: string[]) {
   return Effect.gen(function* () {
     const rows = yield* (
       ids?.length
