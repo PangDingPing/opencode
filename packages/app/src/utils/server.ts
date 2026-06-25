@@ -30,8 +30,16 @@ export function createSdkForServer({
     }
   })()
 
+  // 包装 fetch：跨域请求（dev 模式 :3000 → :4098）必须带 cookie 才能完成会话认证
+  const baseFetch = config.fetch
+  const fetchWithCredentials = (req: any) => {
+    const next = new Request(req, { credentials: "include" })
+    return baseFetch ? baseFetch(next) : fetch(next)
+  }
+
   return createOpencodeClient({
     ...config,
+    fetch: fetchWithCredentials,
     headers: {
       ...(config.headers instanceof Headers ? Object.fromEntries(config.headers.entries()) : config.headers),
       ...auth,
