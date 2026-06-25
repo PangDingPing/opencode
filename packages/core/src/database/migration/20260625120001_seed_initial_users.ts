@@ -23,11 +23,13 @@ export default {
       if (names.length === 0) return
 
       const now = Date.now()
-      const passwordHash = await hash(password, {
-        memoryCost: 19456,
-        timeCost: 2,
-        parallelism: 1,
-      })
+      const passwordHash = yield* Effect.promise(() =>
+        hash(password, {
+          memoryCost: 19456,
+          timeCost: 2,
+          parallelism: 1,
+        }),
+      )
 
       for (const username of names) {
         const id = "usr_" + username

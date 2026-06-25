@@ -1,11 +1,10 @@
-export * as User from "./index"
-
 import { hash, verify } from "@node-rs/argon2"
 import { and, eq } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
 import { UserTable, type Role } from "./sql"
 import { isAllowedName, loadAllowedNames } from "./allowed-names"
+import { LayerNode } from "../effect/layer-node"
 
 // argon2id 参数（OWASP 2024 推荐）
 const ARGON2_OPTIONS = {
@@ -44,13 +43,24 @@ function toUserInfo(row: typeof UserTable.$inferSelect): UserInfo {
   }
 }
 
-export class Service extends Context.Service<Service>()("@opencode/UserService") {
+interface UserServiceIface {
+  createUser: (input: { username: string; password: string; role: Role; displayName?: string }) => Effect.Effect<UserInfo, Error>
+  verifyPassword: (username: string, password: string) => Effect.Effect<UserInfo | null, never>
+  getUser: (id: string) => Effect.Effect<UserInfo, Error>
+  getByUsername: (username: string) => Effect.Effect<UserInfo | null, never>
+  listUsers: () => Effect.Effect<UserInfo[], never>
+  changePassword: (userId: string, newPassword: string) => Effect.Effect<void, Error>
+  resetPassword: (username: string, newPassword: string) => Effect.Effect<void, Error>
+  setDisabled: (userId: string, disabled: boolean) => Effect.Effect<void, never>
+  getAllowedNames: () => Effect.Effect<string[], never>
+}
+
+// Effect 4 beta class-style：class Service extends Context.Service<Service, Interface>()("Key") {}
+export class Service extends Context.Service<Service, UserServiceIface>()("@opencode/UserService") {}
+
+function makeService(): UserServiceIface {
   // 创建用户（admin 操作，username 必须在白名单内）
-  createUser = Effect.fn("User.createUser")(function* (input: {
-    username: string
-    password: string
-    role: Role
-  }) {
+  const createUser = Effect.fn("User.createUser")(function* (input: { username: string; password: string; role: Role; displayName?: string }) {
     if (!isAllowedName(input.username) && input.role !== "admin") {
       return yield* Effect.fail(new Error(`用户名 "${input.username}" 不在白名单内`))
     }
@@ -76,11 +86,17 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
       })
       .run()
       .pipe(Effect.orDie)
-    return yield* this.getUser(id)
+    const row = yield* db
+      .select()
+      .from(UserTable)
+      .where(eq(UserTable.id, id))
+      .get()
+      .pipe(Effect.orDie)
+    return toUserInfo(row!)
   })
 
   // 验证密码（登录用）
-  verifyPassword = Effect.fn("User.verifyPassword")(function* (username: string, password: string) {
+  const verifyPassword = Effect.fn("User.verifyPassword")(function* (username: string, password: string) {
     const { db } = yield* Database.Service
     const row = yield* db
       .select()
@@ -96,7 +112,7 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
   })
 
   // 获取用户
-  getUser = Effect.fn("User.getUser")(function* (id: string) {
+  const getUser = Effect.fn("User.getUser")(function* (id: string) {
     const { db } = yield* Database.Service
     const row = yield* db
       .select()
@@ -108,15 +124,27 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
     return toUserInfo(row)
   })
 
+  // 按 username 获取
+  const getByUsername = Effect.fn("User.getByUsername")(function* (username: string) {
+    const { db } = yield* Database.Service
+    const row = yield* db
+      .select()
+      .from(UserTable)
+      .where(eq(UserTable.username, username))
+      .get()
+      .pipe(Effect.orDie)
+    return row ? toUserInfo(row) : null
+  })
+
   // 列出所有用户
-  listUsers = Effect.fn("User.listUsers")(function* () {
+  const listUsers = Effect.fn("User.listUsers")(function* () {
     const { db } = yield* Database.Service
     const rows = yield* db.select().from(UserTable).all().pipe(Effect.orDie)
     return rows.map(toUserInfo)
   })
 
-  // 改密码（用户自己改或 admin 重置）
-  changePassword = Effect.fn("User.changePassword")(function* (id: string, newPassword: string) {
+  // 改密码（用户自己改）
+  const changePassword = Effect.fn("User.changePassword")(function* (id: string, newPassword: string) {
     if (!validatePassword(newPassword)) {
       return yield* Effect.fail(new Error("密码至少 8 位且必须包含字母和数字"))
     }
@@ -131,7 +159,7 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
   })
 
   // admin 重置密码（强制下次改密）
-  resetPassword = Effect.fn("User.resetPassword")(function* (id: string, newPassword: string) {
+  const resetPassword = Effect.fn("User.resetPassword")(function* (username: string, newPassword: string) {
     if (!validatePassword(newPassword)) {
       return yield* Effect.fail(new Error("密码至少 8 位且必须包含字母和数字"))
     }
@@ -140,13 +168,13 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
     yield* db
       .update(UserTable)
       .set({ password_hash: passwordHash, must_change_password: 1, time_updated: Date.now() })
-      .where(eq(UserTable.id, id))
+      .where(eq(UserTable.username, username))
       .run()
       .pipe(Effect.orDie)
   })
 
   // 禁用/启用用户
-  setDisabled = Effect.fn("User.setDisabled")(function* (id: string, disabled: boolean) {
+  const setDisabled = Effect.fn("User.setDisabled")(function* (id: string, disabled: boolean) {
     const { db } = yield* Database.Service
     yield* db
       .update(UserTable)
@@ -157,14 +185,29 @@ export class Service extends Context.Service<Service>()("@opencode/UserService")
   })
 
   // 获取白名单
-  getAllowedNames = Effect.fn("User.getAllowedNames")(function* () {
+  const getAllowedNames = Effect.fn("User.getAllowedNames")(function* () {
     return loadAllowedNames()
   })
+
+  return {
+    createUser,
+    verifyPassword,
+    getUser,
+    getByUsername,
+    listUsers,
+    changePassword,
+    resetPassword,
+    setDisabled,
+    getAllowedNames,
+  }
 }
 
-export const defaultLayer = Layer.effect(
+export const defaultLayer = Layer.succeed(
   Service,
-  Effect.gen(function* () {
-    return yield* Service.make
-  }),
-).pipe(Layer.provide(Database.defaultLayer))
+  makeService(),
+)
+
+export const node = LayerNode.make(defaultLayer, [Database.node])
+
+// 让 `import { User }` 后能用 User.Service / .defaultLayer / .node
+export const User = { Service, defaultLayer, node }

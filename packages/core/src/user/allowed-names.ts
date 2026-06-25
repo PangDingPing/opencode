@@ -15,7 +15,7 @@ function allowedNamesPath(): string {
   if (envPath && fs.existsSync(envPath)) return envPath
 
   // 本地开发回退：从 core 包向上找到项目根目录
-  const root = path.resolve(import.meta.dirname, "../../..")
+  const root = path.resolve(import.meta.dirname, "../../../..")
   return path.join(root, "docker/allowed-names.txt")
 }
 
