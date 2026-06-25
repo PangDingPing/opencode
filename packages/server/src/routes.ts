@@ -1,8 +1,8 @@
-import { Database } from "@opencode-ai/core/database/database"
+import { defaultLayer as DatabaseDefaultLayer } from "@opencode-ai/core/database/database"
 import { EventV2 } from "@opencode-ai/core/event"
 import { LocationServiceMap } from "@opencode-ai/core/location-layer"
-import { User } from "@opencode-ai/core/user"
-import { AuthToken } from "@opencode-ai/core/auth-token"
+import { defaultLayer as UserDefaultLayer } from "@opencode-ai/core/user"
+import { defaultLayer as AuthTokenDefaultLayer } from "@opencode-ai/core/auth-token"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Layer, Option } from "effect"
@@ -15,20 +15,22 @@ import { schemaErrorLayer } from "./middleware/schema-error"
 
 export function createRoutes(password?: string) {
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-    Layer.provide(handlers),
+    // 必须先 provide 中间件 layers，再 provide handlers
+    // 因为 handlers 内部 .middleware(RequireAdmin) 引用 RequireAdmin key
     Layer.provide(authorizationLayer),
     Layer.provide(requireAdminLayer),
     Layer.provide(schemaErrorLayer),
+    Layer.provide(handlers),
     Layer.provide(
       password
         ? ServerAuth.Config.layer({ username: "opencode", password: Option.some(password) })
         : ServerAuth.Config.defaultLayer,
     ),
     Layer.provide(LocationServiceMap.layer),
-    Layer.provide(Database.defaultLayer),
+    Layer.provide(DatabaseDefaultLayer),
     Layer.provide(EventV2.defaultLayer),
-    Layer.provide(User.defaultLayer),
-    Layer.provide(AuthToken.defaultLayer),
+    Layer.provide(Layer.merge(UserDefaultLayer, DatabaseDefaultLayer)),
+    Layer.provide(Layer.merge(AuthTokenDefaultLayer, DatabaseDefaultLayer)),
     Layer.provide(FetchHttpClient.layer),
   )
 }

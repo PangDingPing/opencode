@@ -1,17 +1,24 @@
 import { ServerAuth } from "../auth"
 import { UnauthorizedError } from "../errors"
 import { Effect, Encoding, Layer, Redacted } from "effect"
-import { HttpEffect, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { HttpEffect, HttpServerRequest } from "effect/unstable/http"
+import type { HttpServerResponse } from "effect/unstable/http"
+import * as HttpServerResponseModule from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
-import { User } from "@opencode-ai/core/user"
-import { AuthToken } from "@opencode-ai/core/auth-token"
+import { Service as UserService } from "@opencode-ai/core/user"
+import type { UserInfo } from "@opencode-ai/core/user"
+import { Service as AuthTokenService } from "@opencode-ai/core/auth-token"
 import { CurrentUser, SESSION_COOKIE } from "./auth"
 
 const AUTH_TOKEN_QUERY = "auth_token"
 const WWW_AUTHENTICATE = 'Basic realm="Secure Area"'
 
 // 不需要认证的路径（登录/登出/健康检查）
-const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/health"])
+const PUBLIC_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/allowed-names",
+  "/api/health",
+])
 
 export class Authorization extends HttpApiMiddleware.Service<Authorization>()("@opencode/HttpApiAuthorization", {
   error: UnauthorizedError,
@@ -57,14 +64,14 @@ function tokenFromCookie(request: HttpServerRequest.HttpServerRequest): string |
 
 export const authorizationLayer = Layer.effect(
   Authorization,
-  Effect.gen(function* () {
-    const config = yield* ServerAuth.Config
-    const userSvc = yield* User.Service
-    const tokenSvc = yield* AuthToken.Service
-    const needsBasicAuth = ServerAuth.required(config)
-
-    return Authorization.of((effect) =>
+  Effect.succeed(
+    Authorization.of((effect) =>
       Effect.gen(function* () {
+        const config = yield* ServerAuth.Config
+        const userSvc = yield* UserService
+    const tokenSvc = yield* AuthTokenService
+        const needsBasicAuth = ServerAuth.required(config)
+
         const request = yield* HttpServerRequest.HttpServerRequest
         const url = new URL(request.url, "http://localhost")
 
@@ -77,16 +84,16 @@ export const authorizationLayer = Layer.effect(
           const tokenInfo = yield* tokenSvc.verify(cookieToken)
           if (tokenInfo) {
             // 惰性续期
-            yield* tokenSvc.extend(cookieToken).pipe(Effect.catchAll(() => Effect.void))
+            yield* tokenSvc.extend(cookieToken).pipe(Effect.catch(() => Effect.void))
             // 加载用户
-            const user = yield* userSvc.getUser(tokenInfo.userId).pipe(Effect.catchAll(() => Effect.succeed(null)))
+            const user = yield* userSvc.getUser(tokenInfo.userId).pipe(Effect.catch(() => Effect.succeed(null)))
             if (user && user.disabled === 0) {
               return yield* effect.pipe(Effect.provideService(CurrentUser, user))
             }
           }
           // cookie 存在但无效 → 拒绝（不回退到 Basic Auth）
           yield* HttpEffect.appendPreResponseHandler((_req, response) =>
-            Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", 'Bearer realm="opencode"')),
+            Effect.succeed(HttpServerResponseModule.HttpServerResponse.setHeader(response, "www-authenticate", 'Bearer realm="opencode"')),
           )
           return yield* new UnauthorizedError({ message: "登录已过期" })
         }
@@ -96,7 +103,7 @@ export const authorizationLayer = Layer.effect(
           const credential = yield* credentialFromRequest(request)
           if (ServerAuth.authorized(credential, config)) {
             // Basic Auth 通过 → 注入一个 admin 用户（CLI 操作不区分用户）
-            const cliUser = {
+            const cliUser: UserInfo = {
               id: "usr_cli",
               username: config.username,
               role: "admin" as const,
@@ -109,13 +116,13 @@ export const authorizationLayer = Layer.effect(
             return yield* effect.pipe(Effect.provideService(CurrentUser, cliUser))
           }
           yield* HttpEffect.appendPreResponseHandler((_req, response) =>
-            Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),
+            Effect.succeed(HttpServerResponseModule.HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),
           )
           return yield* new UnauthorizedError({ message: "Authentication required" })
         }
 
         // 3. 无认证模式（开发环境）→ 注入默认 admin
-        const defaultUser = {
+        const defaultUser: UserInfo = {
           id: "usr_default",
           username: "default",
           role: "admin" as const,
@@ -126,7 +133,7 @@ export const authorizationLayer = Layer.effect(
           time_updated: 0,
         }
         return yield* effect.pipe(Effect.provideService(CurrentUser, defaultUser))
-      }),
-    )
-  }),
+      }) as Effect.Effect<HttpServerResponse, never, never>,
+    ),
+  ),
 )

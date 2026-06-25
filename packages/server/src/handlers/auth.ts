@@ -83,19 +83,20 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
           const tokenInfo = yield* tokenSvc.create(user.id, request.headers["user-agent"], ip)
           const maxAge = Math.floor((tokenInfo.expiresAt - Date.now()) / 1000)
 
-          yield* HttpEffect.appendPreResponseHandler((_req, response) =>
-            Effect.succeed(setSessionCookie(response, tokenInfo.token, maxAge)),
+          // 直接构造带 cookie 的 HttpServerResponse（appendPreResponseHandler 对 plain object 不生效）
+          return setSessionCookie(
+            HttpServerResponse.jsonUnsafe({
+              user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                display_name: user.display_name ?? undefined,
+                must_change_password: user.must_change_password === 1,
+              },
+            }),
+            tokenInfo.token,
+            maxAge,
           )
-
-          return {
-            user: {
-              id: user.id,
-              username: user.username,
-              role: user.role,
-              display_name: user.display_name ?? undefined,
-              must_change_password: user.must_change_password === 1,
-            },
-          }
         }),
       )
       .handle("auth.logout", () =>
@@ -105,10 +106,8 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
           if (token) {
             yield* tokenSvc.revoke(token)
           }
-          yield* HttpEffect.appendPreResponseHandler((_req, response) =>
-            Effect.succeed(clearSessionCookie(response)),
-          )
-          return { ok: true as const }
+          // 直接构造带清除 cookie 的 HttpServerResponse（appendPreResponseHandler 对 plain object 不生效）
+          return clearSessionCookie(HttpServerResponse.jsonUnsafe({ ok: true }))
         }),
       )
       .handle("auth.me", () =>
@@ -145,12 +144,10 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
             yield* tokenSvc.revokeAllForUser(user.id)
             const newToken = yield* tokenSvc.create(user.id, request.headers["user-agent"], getRequestIP(request))
             const maxAge = Math.floor((newToken.expiresAt - Date.now()) / 1000)
-            yield* HttpEffect.appendPreResponseHandler((_req, response) =>
-              Effect.succeed(setSessionCookie(response, newToken.token, maxAge)),
-            )
+            return setSessionCookie(HttpServerResponse.jsonUnsafe({ ok: true }), newToken.token, maxAge)
           }
 
-          return { ok: true as const }
+          return HttpServerResponse.jsonUnsafe({ ok: true })
         }),
       )
       .handle("auth.allowed-names", () =>

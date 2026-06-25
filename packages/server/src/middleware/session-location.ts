@@ -1,4 +1,4 @@
-import { Database } from "@opencode-ai/core/database/database"
+import { Service as DatabaseService } from "@opencode-ai/core/database/database"
 import { LocationServiceMap } from "@opencode-ai/core/location-layer"
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
@@ -26,7 +26,7 @@ const decodeSessionID = Schema.decodeUnknownEffect(SessionV2.ID)
 export const sessionLocationLayer = Layer.effect(
   SessionLocationMiddleware,
   Effect.gen(function* () {
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
     const locations = yield* LocationServiceMap
 
     return SessionLocationMiddleware.of((effect) =>

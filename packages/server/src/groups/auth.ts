@@ -12,7 +12,7 @@ const LoginRequest = Schema.Struct({
 const UserResponse = Schema.Struct({
   id: Schema.String,
   username: Schema.String,
-  role: Schema.Literal("admin", "user"),
+  role: Schema.Union([Schema.Literal("admin"), Schema.Literal("user")]),
   display_name: Schema.String.pipe(Schema.optional),
   must_change_password: Schema.Boolean,
 })

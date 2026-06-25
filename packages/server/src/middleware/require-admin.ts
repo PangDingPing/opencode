@@ -8,15 +8,17 @@ export class RequireAdmin extends HttpApiMiddleware.Service<RequireAdmin>()("@op
   error: ForbiddenError,
 }) {}
 
-export const requireAdminLayer = Layer.succeed(
+export const requireAdminLayer = Layer.effect(
   RequireAdmin,
-  RequireAdmin.of((effect) =>
-    Effect.gen(function* () {
-      const user = yield* CurrentUser
-      if (user.role !== "admin") {
-        return yield* new ForbiddenError({ message: "需要管理员权限" })
-      }
-      return yield* effect
-    }),
+  Effect.succeed(
+    RequireAdmin.of((effect) =>
+      Effect.gen(function* () {
+        const user = yield* CurrentUser
+        if (user.role !== "admin") {
+          return yield* new ForbiddenError({ message: "需要管理员权限" })
+        }
+        return yield* effect
+      }),
+    ),
   ),
 )
