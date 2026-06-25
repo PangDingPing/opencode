@@ -19,6 +19,10 @@
     "./public": "./src/public/index.ts",
     "./session/runner": "./src/session/runner/index.ts",
     "./system-context": "./src/system-context/index.ts",
+    "./user": "./src/user/index.ts",
+    "./user/*": "./src/user/*.ts",
+    "./auth-token": "./src/auth-token/index.ts",
+    "./auth-token/*": "./src/auth-token/*.ts",
     "./*": "./src/*.ts"
   },
   "imports": {
