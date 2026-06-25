@@ -1,0 +1,23 @@
+# Python 依赖清单 (opencode 容器镜像 v0.0.3)
+# 由 uv pip install --system 装到系统 site-packages
+#
+# 来源: D:\AI\AIworkbench\.trae\skills 下 docx / pdf / xlsx 三个 skill
+# 用法: uv pip install --system --no-cache -r requirements.txt
+
+# ----- docx skill -----
+defusedxml>=0.7.1     # unpack.py / pack.py / validators / helpers (安全 XML 解析)
+lxml>=5.0.0           # validators/base.py 等做 OOXML schema 校验
+
+# ----- pdf skill -----
+pypdf>=4.0.0          # 读写/合并/拆分/加密/旋转 (基础)
+pdfplumber>=0.10.0    # 文本和表格提取 (含布局)
+pdf2image>=1.17.0     # PDF 转图片 (依赖系统 poppler)
+Pillow>=10.0.0        # 图像处理 (pdf skill + 参考)
+pytesseract>=0.3.10   # tesseract Python 封装 (按需使用, 镜像里没装 tesseract 也能装)
+reportlab>=4.0.0      # 创建 PDF
+pypdfium2>=4.0.0      # 高性能 PDF 渲染 (reference.md 进阶用法)
+pandas>=2.0.0         # 表格数据分析和导出
+numpy>=1.24.0         # pypdfium2 / pandas 依赖
+
+# ----- xlsx skill -----
+openpyxl>=3.1.0       # 创建/编辑/读取 Excel (含公式/格式)
