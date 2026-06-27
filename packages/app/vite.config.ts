@@ -26,7 +26,7 @@ export default defineConfig({
     allowedHosts: true,
     port: 3000,
     proxy: (() => {
-      const backend = "http://127.0.0.1:2084"
+      const backend = "http://127.0.0.1:4098"
       // dev 模式下前端走同源（location.origin），SDK 所有请求经 vite proxy 转发到后端
       // 列出 SDK 用到的所有顶层路径前缀，避免跨域导致 SameSite=Lax cookie 不发送
       const paths = [
