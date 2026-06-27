@@ -127,13 +127,13 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
           const user = yield* CurrentUser
           const { oldPassword, newPassword } = req.payload
 
-          // 验证旧密码
-          const verified = yield* userSvc.verifyPassword(user.username, oldPassword)
-          if (!verified) {
-            return yield* new InvalidRequestError({ message: "旧密码错误" })
+          if (user.must_change_password !== 1) {
+            const verified = yield* userSvc.verifyPassword(user.username, oldPassword)
+            if (!verified) {
+              return yield* new InvalidRequestError({ message: "旧密码错误" })
+            }
           }
 
-          // 改密
           yield* userSvc.changePassword(user.id, newPassword)
 
           // 撤销其他 session（保留当前）
