@@ -24,6 +24,10 @@ export const UserMenu: Component = () => {
     navigate("/admin/users")
   }
 
+  const openSettings = () => {
+    navigate("/settings")
+  }
+
   const handleLogout = () => {
     void logout()
   }
@@ -53,6 +57,11 @@ export const UserMenu: Component = () => {
           {/* 修改密码 */}
           <DropdownMenu.Item onSelect={openChangePassword}>
             <DropdownMenu.ItemLabel>修改密码</DropdownMenu.ItemLabel>
+          </DropdownMenu.Item>
+
+          {/* 账号设置 */}
+          <DropdownMenu.Item onSelect={openSettings}>
+            <DropdownMenu.ItemLabel>账号设置</DropdownMenu.ItemLabel>
           </DropdownMenu.Item>
 
           {/* 用户管理（仅 admin） */}

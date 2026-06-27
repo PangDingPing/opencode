@@ -96,3 +96,15 @@ export const AuthGroup = HttpApiGroup.make("server.auth")
       }),
     ),
   )
+  .add(
+    HttpApiEndpoint.post("auth.delete-account", "/api/auth/delete-account", {
+      success: Schema.Struct({ ok: Schema.Literal(true) }),
+      error: [UnauthorizedError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "v2.auth.delete-account",
+        summary: "删除当前账号",
+        description: "永久删除当前登录账号并登出",
+      }),
+    ),
+  )

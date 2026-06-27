@@ -156,5 +156,12 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
           return { names }
         }),
       )
+      .handle("auth.delete-account", () =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          yield* userSvc.deleteUser(user.id)
+          return HttpApiSchema.NoContent
+        }),
+      )
   }),
 )

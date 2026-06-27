@@ -57,6 +57,7 @@ const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
 const SkillsPanel = lazy(() => import("@/components/skills-panel"))
 const UsersAdminPage = lazy(() => import("@/pages/admin/users"))
+const UserSettingsPage = lazy(() => import("@/pages/settings"))
 
 const SessionRoute = Object.assign(
   () => {
@@ -421,6 +422,7 @@ export function AppInterface(props: {
                 <Route path="/session/:id?" component={SessionRoute} />
               </Route>
               <Route path="/admin/users" component={UsersAdminPage} />
+              <Route path="/settings" component={UserSettingsPage} />
             </Dynamic>
           </AuthGate>
         </ConnectionGate>

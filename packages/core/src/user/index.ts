@@ -52,6 +52,7 @@ interface UserServiceIface {
   changePassword: (userId: string, newPassword: string) => Effect.Effect<void, Error>
   resetPassword: (username: string, newPassword: string) => Effect.Effect<void, Error>
   setDisabled: (userId: string, disabled: boolean) => Effect.Effect<void, never>
+  deleteUser: (userId: string) => Effect.Effect<void, never>
   getAllowedNames: () => Effect.Effect<string[], never>
 }
 
@@ -184,6 +185,12 @@ function makeService(): UserServiceIface {
       .pipe(Effect.orDie)
   })
 
+  // 删除用户
+  const deleteUser = Effect.fn("User.deleteUser")(function* (id: string) {
+    const { db } = yield* Database.Service
+    yield* db.delete(UserTable).where(eq(UserTable.id, id)).run().pipe(Effect.orDie)
+  })
+
   // 获取白名单
   const getAllowedNames = Effect.fn("User.getAllowedNames")(function* () {
     return loadAllowedNames()
@@ -198,6 +205,7 @@ function makeService(): UserServiceIface {
     changePassword,
     resetPassword,
     setDisabled,
+    deleteUser,
     getAllowedNames,
   }
 }
