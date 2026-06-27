@@ -24,9 +24,7 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
 
     setError("")
 
-    // 首次登录场景不要求旧密码，但后端仍需要 oldPassword 字段
-    // 此时用当前登录态的 cookie 验证，oldPassword 传空字符串
-    const oldPwd = props.forceMode ? "" : oldPassword()
+    const oldPwd = oldPassword()
     const newPwd = newPassword()
 
     const validationError = validatePassword(newPwd)
@@ -40,7 +38,7 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
       return
     }
 
-    if (!props.forceMode && !oldPwd) {
+    if (!oldPwd) {
       setError("请输入旧密码")
       return
     }
@@ -62,8 +60,7 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
         return
       }
 
-      // 改密成功，刷新页面让 AuthGate 重新获取用户状态
-      window.location.reload()
+      window.location.href = "/login"
     } catch {
       setError("网络错误，请重试")
       setLoading(false)
