@@ -4,6 +4,7 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useCurrentUser, logout } from "@/context/auth"
+import { useNavigate } from "@solidjs/router"
 import { lazy } from "solid-js"
 
 // 动态导入改密页和用户管理页（避免首屏加载）
@@ -13,14 +14,14 @@ const ChangePasswordDialog = lazy(() => import("./change-password-dialog"))
 export const UserMenu: Component = () => {
   const { user, isAdmin } = useCurrentUser()
   const dialog = useDialog()
+  const navigate = useNavigate()
 
   const openChangePassword = () => {
     dialog.show(() => <ChangePasswordDialog />)
   }
 
   const openUsersAdmin = () => {
-    // 用户管理页通过新窗口打开（避免路由冲突）
-    window.open("/admin/users", "_blank")
+    navigate("/admin/users")
   }
 
   const handleLogout = () => {

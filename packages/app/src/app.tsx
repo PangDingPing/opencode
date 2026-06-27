@@ -56,6 +56,7 @@ const HomeRoute = lazy(() => import("@/pages/home"))
 const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
 const SkillsPanel = lazy(() => import("@/components/skills-panel"))
+const UsersAdminPage = lazy(() => import("@/pages/admin/users"))
 
 const SessionRoute = Object.assign(
   () => {
@@ -419,6 +420,7 @@ export function AppInterface(props: {
                 <Route path="/" component={() => <Navigate href="session" />} />
                 <Route path="/session/:id?" component={SessionRoute} />
               </Route>
+              <Route path="/admin/users" component={UsersAdminPage} />
             </Dynamic>
           </AuthGate>
         </ConnectionGate>
