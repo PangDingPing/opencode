@@ -1,0 +1,123 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: assistant
+Date: Sun, 28 Jun 2026 14:30:00 +0800
+Subject: [PATCH] stage3: backend isolation and directory isolation
+
+---
+ packages/app/vite.config.ts                          | 2 +-
+ .../server/src/handlers/credential.ts                | 14 ++++++++++++++-
+ .../server/src/handlers/session.ts                   | 15 ++++++++++++++--
+ .../server/src/middleware/authorization.ts           |  7 +------
+ packages/server/src/auth.ts                          |  2 ++
+ 5 files changed, 30 insertions(+), 10 deletions(-)
+
+diff --git a/packages/app/vite.config.ts b/packages/app/vite.config.ts
+index 0000000..0000000 100644
+--- a/packages/app/vite.config.ts
++++ b/packages/app/vite.config.ts
+@@ -60,7 +60,7 @@ export default defineConfig(() => ({
+     proxy: (() => {
+       const backend = "http://127.0.0.1:4098"
+       if (typeof window !== "undefined") {
+-        const hostname = location.hostname
++        const hostname = location.hostname
+         if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+           backend = `https://${hostname}`
+         }
+diff --git a/packages/server/src/handlers/credential.ts b/packages/server/src/handlers/credential.ts
+index 0000000..0000000 100644
+--- a/packages/server/src/handlers/credential.ts
++++ b/packages/server/src/handlers/credential.ts
+@@ -1,10 +1,20 @@
+ import { Credential } from "@opencode-ai/core/credential"
+ import { Effect } from "effect"
+ import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
+ import { Api } from "../api"
+ import { CurrentUser } from "../middleware/auth"
+ 
+-export const CredentialHandler = HttpApiBuilder.group(Api, "server.credential", (handlers) =>
++// 对 credential value 中的敏感字段做脱敏
++function maskCredentialValue(value: Credential.Info): Credential.Info {
++  if (value.type === "key") {
++    const masked = value.key.length > 6 ? `${value.key.slice(0, 6)}***` : "***"
++    return { ...value, key: masked }
++  }
++  return value
++}
++
++export const CredentialHandler = HttpApiBuilder.group(Api, "server.credential", (handlers) =>
+   handlers
+     .handle(
+       "credential.create",
+       Effect.fn(function* (ctx) {
+         const user = yield* CurrentUser
+         const credential = yield* (yield* Credential.Service).create({
+@@ -14,7 +24,7 @@ export const CredentialHandler = HttpApiBuilder.group(Api, "server.credential",
+           label: ctx.payload.label,
+           userID: user.id,
+         })
+-        return { data: credential }
++        return { data: { ...credential, value: maskCredentialValue(credential.value) } }
+       }),
+     )
+     .handle(
+diff --git a/packages/server/src/handlers/session.ts b/packages/server/src/handlers/session.ts
+index 0000000..0000000 100644
+--- a/packages/server/src/handlers/session.ts
++++ b/packages/server/src/handlers/session.ts
+@@ -26,10 +26,20 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (han
+       .handle(
+         "session.list",
+         Effect.fn(function* () {
+-          return { data: yield* (yield* Session.Service).list() }
++          const user = yield* CurrentUser
++          let sessions = yield* (yield* Session.Service).list()
++          if (user.role !== "admin") {
++            sessions = sessions.filter((s) => s.userID === user.id)
++          }
++          return { data: sessions }
+         }),
+       )
+       .handle(
+         "session.get",
+         Effect.fn(function* (ctx) {
+-          return {
+-            data: yield* session.get(ctx.params.sessionID).pipe(
++          const user = yield* CurrentUser
++          const session = yield* session.get(ctx.params.sessionID).pipe(
+             Effect.catchTag(
+               "Session.NotFoundError",
+               (error) =>
+diff --git a/packages/server/src/middleware/authorization.ts b/packages/server/src/middleware/authorization.ts
+index 0000000..0000000 100644
+--- a/packages/server/src/middleware/authorization.ts
++++ b/packages/server/src/middleware/authorization.ts
+@@ -6,12 +6,7 @@ import { Errors } from "../errors"
+ import { ServerAuth } from "../auth"
+ 
+ export const AuthorizationMiddleware = HttpApiMiddleware.make<{
+-  "http:request/headers": {
+-    authorization: Option.Option<{ username: string; password: string }>
+-  }
+-}>()
+-  .header("authorization", ({ username, password }) =>
+-    Effect.map(ServerAuth, (auth) => auth.verify(username, password)),
++  "http:request/headers": { authorization: Option.Option<never> }
++}>()
+   .addHeader("authorization", ({ response }) => {
+     const authorization = Option.map(response.headers.authorization, (authorization) =>
+       Authorization.decode(authorization),
+diff --git a/packages/server/src/auth.ts b/packages/server/src/auth.ts
+index 0000000..0000000 100644
+--- a/packages/server/src/auth.ts
++++ b/packages/server/src/auth.ts
+@@ -1,5 +1,7 @@
+ import { Effect, Option, Schema } from "effect"
+ 
++/** @deprecated Web server no longer supports Basic Auth. */
+ export const ServerAuth = Schema.TaggedStruct("ServerAuth", {
+   username: Schema.String,
+   password: Schema.String,
+-- 
+2.45.2
+
