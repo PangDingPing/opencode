@@ -218,6 +218,7 @@ export const layer = Layer.effect(
           version: InstallationVersion,
           projectID: project.id,
           directory: input.location.directory,
+          user_id: input.userID,
           path: path.relative(project.directory, input.location.directory).replaceAll("\\", "/"),
           workspaceID: input.location.workspaceID ? WorkspaceV2.ID.make(input.location.workspaceID) : undefined,
           title: `New session - ${new Date(now).toISOString()}`,
@@ -252,15 +253,6 @@ export const layer = Layer.effect(
             }),
           )
         if (projected.type === "existing") return projected.session
-        // 写入 user_id（owner），用于多用户隔离
-        if (input.userID) {
-          yield* db
-            .update(SessionTable)
-            .set({ user_id: input.userID })
-            .where(eq(SessionTable.id, sessionID))
-            .run()
-            .pipe(Effect.orDie)
-        }
         // TODO: Restore recorded sessions onto replacement synchronized workspaces in a future API slice.
         return yield* result.get(sessionID).pipe(Effect.orDie)
       }),
