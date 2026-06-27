@@ -82,19 +82,17 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
         </div>
 
         <form class="flex flex-col gap-4 w-full" onSubmit={handleSubmit}>
-          <Show when={!props.forceMode}>
-            <div class="flex flex-col gap-1.5">
-              <label class="text-12-regular text-text-base">旧密码</label>
-              <input
-                type="password"
-                class="h-10 px-3 rounded-md border border-border-weak-base bg-surface-base text-14-regular text-text-strong outline-none focus:border-border-strong-base"
-                value={oldPassword()}
-                onInput={(e) => setOldPassword(e.currentTarget.value)}
-                autocomplete="current-password"
-                required
-              />
-            </div>
-          </Show>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-12-regular text-text-base">旧密码</label>
+            <input
+              type="password"
+              class="h-10 px-3 rounded-md border border-border-weak-base bg-surface-base text-14-regular text-text-strong outline-none focus:border-border-strong-base"
+              value={oldPassword()}
+              onInput={(e) => setOldPassword(e.currentTarget.value)}
+              autocomplete="current-password"
+              required
+            />
+          </div>
 
           <div class="flex flex-col gap-1.5">
             <label class="text-12-regular text-text-base">新密码</label>
