@@ -30,7 +30,7 @@ import { previewSelectedLines } from "@opencode-ai/ui/pierre/selection-bridge"
 import { Button } from "@opencode-ai/ui/button"
 import { showToast } from "@/utils/toast"
 import { checksum } from "@opencode-ai/core/util/encode"
-import { useLocation, useSearchParams } from "@solidjs/router"
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router"
 import { NewSessionView, SessionHeader } from "@/components/session"
 import { useComments } from "@/context/comments"
 import { getSessionPrefetch, SESSION_PREFETCH_TTL } from "@/context/global-sync/session-prefetch"
@@ -202,6 +202,7 @@ export default function Page() {
   const server = useServer()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const location = useLocation()
+  const navigate = useNavigate()
   const { params, sessionKey, workspaceKey, tabs, view } = useSessionLayout()
   const newSessionDesign = createMemo(() => settings.general.newLayoutDesigns())
 
@@ -633,7 +634,7 @@ export default function Page() {
 
   const [sessionSync] = createResource(
     () => [sdk.directory, params.id] as const,
-    ([directory, id]) => {
+    async ([directory, id]) => {
       if (refreshFrame !== undefined) cancelAnimationFrame(refreshFrame)
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
       refreshFrame = undefined
@@ -660,7 +661,19 @@ export default function Page() {
         }, 0)
       })
 
-      return sync.session.sync(id)
+      // 同步可能因 404 / 无权访问 throw,这里统一吞掉,
+      // 由下面的判断决定是否需要跳转到新会话页面
+      try {
+        await sync.session.sync(id)
+      } catch {}
+
+      // 同步完成后,如果当前 session 仍然找不到（404 或无权访问）,
+      // 跳转到新会话页面（replace 替换 URL,避免浏览器返回键回到 404）
+      const currentId = untrack(() => params.id)
+      const currentDir = untrack(() => params.dir)
+      if (currentId === id && currentDir && !untrack(() => sync.session.get(id))) {
+        navigate(`/${currentDir}/session`, { replace: true })
+      }
     },
   )
 
