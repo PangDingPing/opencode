@@ -40,6 +40,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { UserID } from "@opencode-ai/core/user/sql"
 import { SessionID, MessageID, PartID } from "./schema"
 
 import type { Provider } from "@/provider/provider"
@@ -84,6 +85,7 @@ export function fromRow(row: SessionRow): Info {
     directory: row.directory,
     path: row.path ?? undefined,
     parentID: row.parent_id ?? undefined,
+    user_id: row.user_id ?? undefined,
     title: row.title,
     agent: row.agent ?? undefined,
     model: row.model
@@ -123,6 +125,7 @@ export function toRow(info: Info) {
     id: info.id,
     project_id: info.projectID,
     workspace_id: info.workspaceID,
+    user_id: info.user_id,
     parent_id: info.parentID,
     slug: info.slug,
     directory: info.directory,
@@ -223,6 +226,7 @@ export const Info = Schema.Struct({
   directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   parentID: optionalOmitUndefined(SessionID),
+  user_id: optionalOmitUndefined(UserID),
   summary: optionalOmitUndefined(Summary),
   cost: optionalOmitUndefined(Schema.Finite),
   tokens: optionalOmitUndefined(Tokens),
@@ -260,6 +264,7 @@ export const CreateInput = Schema.optional(
     metadata: Schema.optional(Metadata),
     permission: Schema.optional(PermissionV1.Ruleset),
     workspaceID: Schema.optional(WorkspaceV2.ID),
+    userID: Schema.optional(UserID),
   }),
 )
 export type CreateInput = Types.DeepMutable<Schema.Schema.Type<typeof CreateInput>>
@@ -302,6 +307,7 @@ export type ListInput = {
   start?: number
   search?: string
   limit?: number
+  userID?: UserID
 }
 
 export type GlobalListInput = {
@@ -312,6 +318,7 @@ export type GlobalListInput = {
   search?: string
   limit?: number
   archived?: boolean
+  userID?: UserID
 }
 
 const CreatedEventSchema = Schema.Struct({
@@ -554,6 +561,7 @@ export const layer: Layer.Layer<
       path?: string
       metadata?: typeof Metadata.Type
       permission?: PermissionV1.Ruleset
+      userID?: UserID
     }) {
       const ctx = yield* InstanceState.context
       const result: Info = {
@@ -565,6 +573,7 @@ export const layer: Layer.Layer<
         path: input.path,
         workspaceID: input.workspaceID,
         parentID: input.parentID,
+        user_id: input.userID,
         title: input.title ?? (input.parentID ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString(),
         agent: input.agent,
         model: input.model,
@@ -601,6 +610,7 @@ export const layer: Layer.Layer<
 
     const listGlobal = Effect.fn("Session.listGlobal")(function* (input?: GlobalListInput) {
       const conditions: SQL[] = []
+      if (input?.userID) conditions.push(eq(SessionTable.user_id, input.userID))
       if (input?.directory) conditions.push(eq(SessionTable.directory, input.directory))
       if (input?.roots) conditions.push(isNull(SessionTable.parent_id))
       if (input?.start) conditions.push(gte(SessionTable.time_updated, input.start))
@@ -719,6 +729,7 @@ export const layer: Layer.Layer<
       metadata?: typeof Metadata.Type
       permission?: PermissionV1.Ruleset
       workspaceID?: WorkspaceV2.ID
+      userID?: UserID
     }) {
       const ctx = yield* InstanceState.context
       const workspace = yield* InstanceState.workspaceID
@@ -732,6 +743,7 @@ export const layer: Layer.Layer<
         metadata: input?.metadata,
         permission: input?.permission,
         workspaceID: input?.workspaceID ?? workspace,
+        userID: input?.userID,
       })
     })
 
@@ -999,10 +1011,14 @@ function listByProject(
   input: ListInput & {
     projectID: ProjectV2.ID
     experimentalWorkspaces: boolean
+    userID?: UserID
   },
 ) {
   const conditions = [eq(SessionTable.project_id, input.projectID)]
 
+  if (input.userID) {
+    conditions.push(eq(SessionTable.user_id, input.userID))
+  }
   if (input.workspaceID) {
     conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
   }
