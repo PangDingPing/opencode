@@ -36,7 +36,10 @@ import {
   UpdatePayload,
 } from "../groups/session"
 import { PermissionNotFoundError } from "../errors"
+import * as ApiError from "../errors"
 import * as SessionError from "./session-errors"
+import { CurrentUser } from "@opencode-ai/server/middleware/auth"
+import { UserID } from "@opencode-ai/core/user/sql"
 
 const tryParseJson = (text: string) =>
   Effect.try({
@@ -61,6 +64,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const scope = yield* Scope.Scope
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
+      const user = (yield* Effect.serviceOption(CurrentUser)) as Option.Option<{ id: string; role?: string }>
+      // admin 看所有 session，普通用户只看自己的
+      const userID = Option.isSome(user) && user.value.role !== "admin" ? UserID.make(user.value.id) : undefined
       return yield* session.list({
         directory: ctx.query.scope === "project" ? undefined : ctx.query.directory,
         scope: ctx.query.scope,
@@ -69,6 +75,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         start: ctx.query.start,
         search: ctx.query.search,
         limit: ctx.query.limit,
+        userID,
       })
     })
 
@@ -77,7 +84,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const requireSession = Effect.fn("SessionHttpApi.requireSession")(function* (sessionID: SessionID) {
-      return yield* SessionError.mapStorageNotFound(session.get(sessionID))
+      const info = yield* SessionError.mapStorageNotFound(session.get(sessionID))
+      // 非 admin 用户只能访问自己的 session
+      const user = (yield* Effect.serviceOption(CurrentUser)) as Option.Option<{ id: string; role?: string }>
+      const denied =
+        Option.isSome(user) && user.value.role !== "admin" && info.user_id !== user.value.id
+      if (denied) {
+        return yield* SessionError.mapStorageNotFound(Effect.fail({ message: `Session not found: ${sessionID}` } as any))
+      }
+      return info
     })
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {
@@ -151,7 +166,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
-      return yield* shareSvc.create(ctx.payload)
+      const user = (yield* Effect.serviceOption(CurrentUser)) as Option.Option<{ id: string; role?: string }>
+      const userID = Option.isSome(user) ? UserID.make(user.value.id) : undefined
+      return yield* shareSvc.create({
+        ...(ctx.payload ? ctx.payload : {}),
+        ...(userID ? { userID } : {}),
+      } as Session.CreateInput)
     })
 
     const createRaw = Effect.fn("SessionHttpApi.createRaw")(function* (ctx: {
