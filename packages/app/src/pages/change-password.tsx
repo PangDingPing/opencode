@@ -1,5 +1,4 @@
 import { createSignal, Show, type Component } from "solid-js"
-import { Splash } from "@opencode-ai/ui/logo"
 import { Button } from "@opencode-ai/ui/button"
 
 // 改密页：首次登录（forceMode）只输入新密码，日常改密需输入旧密码
@@ -60,7 +59,7 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
         return
       }
 
-      window.location.href = "/login"
+      window.location.href = "/new-session"
     } catch {
       setError("网络错误，请重试")
       setLoading(false)
@@ -70,7 +69,7 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
       <div class="flex flex-col items-center gap-8 w-full max-w-sm px-6">
-        <Splash class="w-12 h-15" />
+        <img src="/LOGO.png" alt="冶建图审·数智办公系统" class="h-15 w-auto" />
 
         <div class="flex flex-col items-center gap-2">
           <h1 class="text-20-medium text-text-strong">
