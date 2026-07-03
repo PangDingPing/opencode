@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
 import { UserTable, type Role } from "./sql"
-import { isAllowedName, loadAllowedNames } from "./allowed-names"
+import { loadAllowedNames } from "./allowed-names"
 import { LayerNode } from "../effect/layer-node"
 
 // argon2id 参数（OWASP 2024 推荐）
@@ -49,6 +49,7 @@ interface UserServiceIface {
   getUser: (id: string) => Effect.Effect<UserInfo, Error>
   getByUsername: (username: string) => Effect.Effect<UserInfo | null, never>
   listUsers: () => Effect.Effect<UserInfo[], never>
+  updateUser: (input: { id: string; role?: Role; display_name?: string | null }) => Effect.Effect<void, Error>
   changePassword: (userId: string, newPassword: string) => Effect.Effect<void, Error>
   resetPassword: (username: string, newPassword: string) => Effect.Effect<void, Error>
   setDisabled: (userId: string, disabled: boolean) => Effect.Effect<void, never>
@@ -60,11 +61,8 @@ interface UserServiceIface {
 export class Service extends Context.Service<Service, UserServiceIface>()("@opencode/UserService") {}
 
 function makeService(): UserServiceIface {
-  // 创建用户（admin 操作，username 必须在白名单内）
+  // 创建用户（admin 操作，username 可自定义，不受白名单限制）
   const createUser = Effect.fn("User.createUser")(function* (input: { username: string; password: string; role: Role; displayName?: string }) {
-    if (!isAllowedName(input.username) && input.role !== "admin") {
-      return yield* Effect.fail(new Error(`用户名 "${input.username}" 不在白名单内`))
-    }
     if (!validatePassword(input.password)) {
       return yield* Effect.fail(new Error("密码至少 8 位且必须包含字母和数字"))
     }
@@ -144,6 +142,15 @@ function makeService(): UserServiceIface {
     return rows.map(toUserInfo)
   })
 
+  // 修改用户（admin 操作：role / display_name）
+  const updateUser = Effect.fn("User.updateUser")(function* (input: { id: string; role?: Role; display_name?: string | null }) {
+    const { db } = yield* Database.Service
+    const set: { role?: Role; display_name?: string | null; time_updated: number } = { time_updated: Date.now() }
+    if (input.role !== undefined) set.role = input.role
+    if (input.display_name !== undefined) set.display_name = input.display_name
+    yield* db.update(UserTable).set(set).where(eq(UserTable.id, input.id)).run().pipe(Effect.orDie)
+  })
+
   // 改密码（用户自己改）
   const changePassword = Effect.fn("User.changePassword")(function* (id: string, newPassword: string) {
     if (!validatePassword(newPassword)) {
@@ -202,6 +209,7 @@ function makeService(): UserServiceIface {
     getUser,
     getByUsername,
     listUsers,
+    updateUser,
     changePassword,
     resetPassword,
     setDisabled,
