@@ -1,37 +1,17 @@
-import { createSignal, type Component } from "solid-js"
+import { type Component, lazy } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
-import { useCurrentUser, logout } from "@/context/auth"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { useCurrentUser } from "@/context/auth"
+
+// 动态导入改密对话框（避免首屏加载）
+const ChangePasswordDialog = lazy(() => import("@/components/change-password-dialog"))
 
 const UserSettingsPage: Component = () => {
-  const { user, isAdmin, refetch } = useCurrentUser()
-  const [error, setError] = createSignal("")
-  const [loading, setLoading] = createSignal(false)
+  const { user, isAdmin } = useCurrentUser()
+  const dialog = useDialog()
 
-  const handleDeleteAccount = async () => {
-    if (!confirm("确定要删除当前账号吗？此操作不可恢复。")) return
-
-    setLoading(true)
-    setError("")
-
-    try {
-      const res = await fetch("/api/auth/delete-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setError(data.message ?? "删除失败")
-        setLoading(false)
-        return
-      }
-
-      await logout()
-    } catch {
-      setError("网络错误，请重试")
-      setLoading(false)
-    }
+  const openChangePassword = () => {
+    dialog.show(() => <ChangePasswordDialog />)
   }
 
   return (
@@ -51,18 +31,10 @@ const UserSettingsPage: Component = () => {
           </div>
 
           <div class="flex flex-col gap-2 pt-4">
-            <Button variant="secondary" size="large" onClick={() => (window.location.href = "/change-password")}>
+            <Button variant="secondary" size="large" onClick={openChangePassword}>
               修改密码
             </Button>
-
-            <Button variant="destructive" size="large" disabled={loading()} onClick={handleDeleteAccount}>
-              {loading() ? "处理中..." : "删除账号"}
-            </Button>
           </div>
-
-          <Show when={error()}>
-            <div class="text-12-regular text-text-danger px-1">{error()}</div>
-          </Show>
         </div>
       </div>
     </div>
