@@ -19,10 +19,12 @@ import { IntegrationGroup } from "./groups/integration"
 import { CredentialGroup } from "./groups/credential"
 import { ProjectCopyGroup } from "./groups/project-copy"
 import { AuthGroup } from "./groups/auth"
+import { AdminGroup } from "./groups/admin"
 
 export const Api = HttpApi.make("server")
   .add(HealthGroup)
   .add(AuthGroup)
+  .add(AdminGroup)
   .add(LocationGroup)
   .add(AgentGroup)
   .add(SessionGroup)
