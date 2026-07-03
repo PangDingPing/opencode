@@ -27,10 +27,12 @@ import { CredentialHandler } from "./handlers/credential"
 import { Credential } from "@opencode-ai/core/credential"
 import { ProjectCopyHandler } from "./handlers/project-copy"
 import { AuthHandler } from "./handlers/auth"
+import { AdminHandler } from "./handlers/admin"
 
 export const handlers = Layer.mergeAll(
   HealthHandler,
   AuthHandler,
+  AdminHandler,
   LocationHandler,
   AgentHandler,
   SessionHandler,
