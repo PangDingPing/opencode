@@ -1,5 +1,4 @@
 import { createSignal, Show, type Component } from "solid-js"
-import { Splash } from "@opencode-ai/ui/logo"
 import { Button } from "@opencode-ai/ui/button"
 import { useLanguage } from "@/context/language"
 
@@ -50,10 +49,10 @@ const LoginPage: Component<{ onLoginSuccess: () => void }> = (props) => {
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
       <div class="flex flex-col items-center gap-8 w-full max-w-sm px-6">
-        <Splash class="w-12 h-15" />
+        <img src="/LOGO.png" alt="冶建图审·数智办公系统" class="h-15 w-auto" />
 
         <div class="flex flex-col items-center gap-2">
-          <h1 class="text-20-medium text-text-strong">opencode</h1>
+          <h1 class="text-20-medium text-text-strong">冶建图审·数智办公系统</h1>
           <p class="text-14-regular text-text-base">请登录后使用</p>
         </div>
 
