@@ -3,11 +3,7 @@ import { eq } from "drizzle-orm"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { Effect, Layer, Option, Schema, Context } from "effect"
 
-import {
-  defaultLayer as DatabaseDefaultLayer,
-  node as DatabaseNode,
-  Service as DatabaseService,
-} from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { AccountStateTable, AccountTable } from "@opencode-ai/core/account/sql"
 import { AccessToken, AccountID, AccountRepoError, Info, OrgID, RefreshToken } from "./schema"
 import { normalizeServerUrl } from "./url"
@@ -43,10 +39,10 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Ac
 
 export const use = serviceUse(Service)
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const { db } = yield* DatabaseService
+    const { db } = yield* Database.Service
     const decode = Schema.decodeUnknownSync(Info)
 
     const query = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -170,8 +166,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(Layer.provide(DatabaseDefaultLayer))
-
-export const node = LayerNode.make(layer, [DatabaseNode])
+export const node = LayerNode.make({ service: Service, layer: layer, deps: [Database.node] })
 
 export * as AccountRepo from "./repo"

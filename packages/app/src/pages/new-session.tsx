@@ -1,48 +1,73 @@
-import { Show, createEffect, createMemo, onMount, untrack } from "solid-js"
+import { Show, createEffect, createMemo, createResource, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSearchParams } from "@solidjs/router"
-import { createMediaQuery } from "@solid-primitives/media"
-import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
-import FileTree from "@/components/file-tree"
 import { NewSessionDesignView } from "@/components/session"
+import { PromptInput } from "@/components/prompt-input"
+import { useSettingsCommand } from "@/components/settings-dialog"
+import {
+  PromptProjectAddButton,
+  PromptProjectSelector,
+  createPromptProjectController,
+} from "@/components/prompt-project-selector"
 import { useComments } from "@/context/comments"
-import { useFile } from "@/context/file"
-import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
-import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
-import { createSessionComposerState, SessionComposerRegion } from "@/pages/session/composer"
-import { shouldShowFileTree } from "@/pages/session/helpers"
+import { useServerSync } from "@/context/server-sync"
+import { useLanguage } from "@/context/language"
+import { createPromptInputController, createPromptProjectControls } from "@/pages/session/composer"
+import { useSessionKey } from "@/pages/session/session-layout"
+import { useComposerCommands } from "@/pages/session/use-composer-commands"
+import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
+import { PromptWorkspaceSelector } from "@/components/prompt-workspace-selector"
+
+const showWorkspaceBar = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 /**
- * The `/new-session` draft page. Renders the prompt composer plus a lightweight file
- * tree sidebar (no terminal, review pane, or message timeline). Submitting promotes
- * the draft into a real session (see prompt-input/submit).
+ * The `/new-session` draft page. Unlike `session.tsx`, this only renders the prompt
+ * composer for a brand-new session — no terminal, review pane, file tree, or message
+ * timeline. Submitting promotes the draft into a real session (see prompt-input/submit).
  */
 export default function NewSessionPage() {
   const prompt = usePrompt()
   const sdk = useSDK()
   const sync = useSync()
+  const serverSync = useServerSync()
   const comments = useComments()
-  const file = useFile()
-  const layout = useLayout()
-  const settings = useSettings()
-  const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
+  const language = useLanguage()
+  const route = useSessionKey()
+  const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
+
+  useComposerCommands()
+  useSettingsCommand()
 
   let inputRef: HTMLDivElement | undefined
 
-  const composer = createSessionComposerState()
-
-  const [store, setStore] = createStore({
-    worktree: "main",
+  const inputController = createPromptInputController({
+    sessionKey: route.sessionKey,
+    sessionID: () => route.params.id,
+    queryOptions: serverSync().queryOptions,
+  })
+  const projectControls = createPromptProjectControls()
+  const projectController = createPromptProjectController({
+    controls: projectControls,
+    onDone: () => inputRef?.focus(),
   })
 
+  const [store, setStore] = createStore<{ worktree?: string }>({})
+
   const newSessionWorktree = createMemo(() => {
-    if (store.worktree === "create") return "create"
-    const project = sync.project
-    if (project && sdk.directory !== project.worktree) return sdk.directory
+    if (store.worktree) return store.worktree
+    const project = sync().project
+    if (project && sdk().directory !== project.worktree) return sdk().directory
     return "main"
+  })
+  const projectRoot = createMemo(() => sync().project?.worktree ?? sdk().directory)
+  const localBranch = createMemo(() => serverSync().child(projectRoot())[0].vcs?.branch)
+  const selectedBranch = createMemo(() => {
+    const worktree = newSessionWorktree()
+    if (worktree === "main" || worktree === "create") return localBranch()
+    return serverSync().child(worktree)[0].vcs?.branch ?? localBranch()
   })
 
   createEffect(() => {
@@ -55,78 +80,84 @@ export default function NewSessionPage() {
     })
   })
 
-  onMount(() => {
+  createEffect(() => {
+    if (!prompt.ready()) return
     requestAnimationFrame(() => inputRef?.focus())
   })
-
-  const isDesktop = createMediaQuery("(min-width: 768px)")
-
-  // 文件树是否显示：桌面端 + 用户偏好 + 已展开
-  const fileTreeOpen = createMemo(
-    () =>
-      isDesktop() &&
-      shouldShowFileTree({
-        visible: settings.visibility.fileTree(),
-        opened: layout.fileTree.opened(),
-      }),
+  const ready = Promise.resolve()
+  const [promptReady] = createResource(
+    () => prompt.ready.promise ?? ready,
+    (promise) => promise.then(() => true),
   )
-
-  // 文件树加载副作用：目录变化或首次展开时拉取文件列表
-  let treeDir: string | undefined
-  createEffect(() => {
-    const dir = sdk.directory
-    if (!isDesktop()) return
-    if (!layout.fileTree.opened()) return
-    if (sync.status === "loading") return
-    const refresh = treeDir !== dir
-    treeDir = dir
-    void (refresh ? file.tree.refresh("") : file.tree.list(""))
-  })
 
   return (
     <div class="relative size-full overflow-hidden flex flex-col">
-      <div class="flex-1 min-h-0 flex gap-2 p-2">
-        <div class="@container relative flex flex-col min-h-0 h-full bg-background-stronger flex-1">
+      <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
+        <div class="@container relative flex flex-col min-h-0 h-full flex-1">
           <div class="flex-1 min-h-0 overflow-hidden rounded-[10px]">
             <NewSessionDesignView>
-              <SessionComposerRegion
-                state={composer}
-                ready
-                centered={false}
-                placement="inline"
-                inputRef={(el) => {
-                  inputRef = el
-                }}
-                newSessionWorktree={newSessionWorktree()}
-                onNewSessionWorktreeReset={() => setStore("worktree", "main")}
-                onSubmit={() => comments.clear()}
-                onResponseSubmit={() => {}}
-                setPromptDockRef={() => {}}
-              />
+              <div class={NEW_SESSION_CONTENT_WIDTH}>
+                <Show
+                  when={prompt.ready() || promptReady()}
+                  fallback={
+                    <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
+                      {language.t("prompt.loading")}
+                    </div>
+                  }
+                >
+                  <div class="flex flex-col" classList={{ "gap-8": showWorkspaceBar, "gap-3": !showWorkspaceBar }}>
+                    <PromptInput
+                      controls={inputController()}
+                      variant="new-session"
+                      ref={(el) => {
+                        inputRef = el
+                      }}
+                      newSessionWorktree={newSessionWorktree()}
+                      onNewSessionWorktreeReset={() => setStore("worktree", undefined)}
+                      onSubmit={() => comments.clear()}
+                      toolbar={
+                        <Show when={!projectController.selected()}>
+                          <PromptProjectAddButton controller={projectController} />
+                        </Show>
+                      }
+                    />
+                    <Show when={projectController.selected()}>
+                      <div
+                        class="flex min-h-7 min-w-0 items-center gap-0 text-v2-text-text-faint"
+                        classList={{
+                          "flex-col justify-center sm:flex-row": showWorkspaceBar,
+                          "justify-start": !showWorkspaceBar,
+                        }}
+                      >
+                        <PromptProjectSelector
+                          controller={projectController}
+                          placement={showWorkspaceBar ? "bottom" : "bottom-start"}
+                        />
+                        <Show when={showWorkspaceBar}>
+                          <PromptWorkspaceSelector
+                            value={newSessionWorktree()}
+                            projectRoot={projectRoot()}
+                            workspaces={sync().project?.sandboxes ?? []}
+                            branch={selectedBranch()}
+                            onChange={(value) =>
+                              setStore(
+                                "worktree",
+                                value === "main" && sync().project?.worktree !== sdk().directory
+                                  ? sync().project?.worktree
+                                  : value,
+                              )
+                            }
+                            onDone={() => inputRef?.focus()}
+                          />
+                        </Show>
+                      </div>
+                    </Show>
+                  </div>
+                </Show>
+              </div>
             </NewSessionDesignView>
           </div>
         </div>
-
-        <Show when={fileTreeOpen()}>
-          <aside
-            id="file-tree-panel"
-            aria-label="File tree"
-            class="relative min-w-0 h-full shrink-0 overflow-hidden bg-background-stronger rounded-[10px] border-l border-border-weaker-base"
-            style={{ width: `${layout.fileTree.width()}px` }}
-          >
-            <div class="h-full flex flex-col overflow-hidden">
-              <FileTree path="" class="pt-3" onFileClick={() => {}} />
-            </div>
-            <ResizeHandle
-              direction="horizontal"
-              edge="start"
-              size={layout.fileTree.width()}
-              min={200}
-              max={480}
-              onResize={(width) => layout.fileTree.resize(width)}
-            />
-          </aside>
-        </Show>
       </div>
     </div>
   )

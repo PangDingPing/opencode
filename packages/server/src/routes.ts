@@ -1,37 +1,64 @@
-import { defaultLayer as DatabaseDefaultLayer } from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { EventV2 } from "@opencode-ai/core/event"
-import { LocationServiceMap } from "@opencode-ai/core/location-layer"
-import { defaultLayer as UserDefaultLayer } from "@opencode-ai/core/user"
-import { defaultLayer as AuthTokenDefaultLayer } from "@opencode-ai/core/auth-token"
-import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
+import { Credential } from "@opencode-ai/core/credential"
+import { PermissionSaved } from "@opencode-ai/core/permission/saved"
+import { PtyTicket } from "@opencode-ai/core/pty/ticket"
+import { SessionV2 } from "@opencode-ai/core/session"
+import { SessionExecution } from "@opencode-ai/core/session/execution"
+import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
+import { SessionExecutionLocal } from "@opencode-ai/core/session/execution/local"
+import { ToolOutputStore } from "@opencode-ai/core/tool-output-store"
+import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Layer, Option } from "effect"
 import { Api } from "./api"
 import { ServerAuth } from "./auth"
 import { handlers } from "./handlers"
 import { authorizationLayer } from "./middleware/authorization"
-import { requireAdminLayer } from "./middleware/require-admin"
 import { schemaErrorLayer } from "./middleware/schema-error"
+import { PtyEnvironment } from "./pty-environment"
+import { layer as locationLayer } from "./location"
+import { sessionLocationLayer } from "./middleware/session-location"
+
+const applicationServices = LayerNode.group([
+  Database.node,
+  EventV2.node,
+  httpClient,
+  ToolOutputStore.cleanupNode,
+  SessionV2.node,
+  PermissionSaved.node,
+  PtyTicket.node,
+  Credential.node,
+  PtyEnvironment.node,
+  LocationServiceMap.node,
+])
 
 export function createRoutes(password?: string) {
+  return makeRoutes(
+    password
+      ? ServerAuth.Config.configLayer({ username: "opencode", password: Option.some(password) })
+      : ServerAuth.Config.layer,
+  )
+}
+
+export function createEmbeddedRoutes() {
+  return makeRoutes(ServerAuth.Config.configLayer({ username: "opencode", password: Option.none() }))
+}
+
+function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config, AuthError, AuthServices>) {
+  const serviceLayer = AppNodeBuilder.build(applicationServices, [[SessionExecution.node, SessionExecutionLocal.node]])
+
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-    // 必须先 provide 中间件 layers，再 provide handlers
-    // 因为 handlers 内部 .middleware(RequireAdmin) 引用 RequireAdmin key
-    Layer.provide(authorizationLayer),
-    Layer.provide(requireAdminLayer),
-    Layer.provide(schemaErrorLayer),
     Layer.provide(handlers),
-    Layer.provide(
-      password
-        ? ServerAuth.Config.layer({ username: "opencode", password: Option.some(password) })
-        : ServerAuth.Config.defaultLayer,
-    ),
-    Layer.provide(LocationServiceMap.layer),
-    Layer.provide(DatabaseDefaultLayer),
-    Layer.provide(EventV2.defaultLayer),
-    Layer.provide(Layer.merge(UserDefaultLayer, DatabaseDefaultLayer)),
-    Layer.provide(Layer.merge(AuthTokenDefaultLayer, DatabaseDefaultLayer)),
-    Layer.provide(FetchHttpClient.layer),
+    Layer.provide(sessionLocationLayer),
+    Layer.provide(locationLayer),
+    Layer.provide(authorizationLayer),
+    Layer.provide(schemaErrorLayer),
+    Layer.provide(auth),
+    Layer.provide(serviceLayer),
   )
 }
 

@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { httpClient } from "@opencode-ai/core/effect/layer-node-platform"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import type * as SDK from "@opencode-ai/sdk/v2"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { Effect, Exit, Layer, Option, Schema, Scope, Context, Stream } from "effect"
@@ -12,11 +12,7 @@ import { Provider } from "@/provider/provider"
 import { Session } from "@/session/session"
 import { MessageV2 } from "@/session/message-v2"
 import type { SessionID } from "@/session/schema"
-import {
-  defaultLayer as DatabaseDefaultLayer,
-  node as DatabaseNode,
-  Service as DatabaseService,
-} from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
 import { Config } from "@/config/config"
 import { SessionShareTable } from "@opencode-ai/core/share/sql"
@@ -113,13 +109,13 @@ function key(item: Data) {
   }
 }
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const account = yield* Account.Service
     const events = yield* EventV2Bridge.Service
     const cfg = yield* Config.Service
-    const { db } = yield* DatabaseService
+    const { db } = yield* Database.Service
     const http = yield* HttpClient.HttpClient
     const httpOk = HttpClient.filterStatusOk(http)
     const provider = yield* Provider.Service
@@ -366,24 +362,10 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(Account.defaultLayer),
-  Layer.provide(Config.defaultLayer),
-  Layer.provide(DatabaseDefaultLayer),
-  Layer.provide(FetchHttpClient.layer),
-  Layer.provide(Provider.defaultLayer),
-  Layer.provide(Session.defaultLayer),
-)
-
-export const node = LayerNode.make(layer, [
-  Account.node,
-  EventV2Bridge.node,
-  Config.node,
-  DatabaseNode,
-  httpClient,
-  Provider.node,
-  Session.node,
-])
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [Account.node, EventV2Bridge.node, Config.node, Database.node, httpClient, Provider.node, Session.node],
+})
 
 export * as ShareNext from "./share-next"

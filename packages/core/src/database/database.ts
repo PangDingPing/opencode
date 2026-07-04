@@ -1,3 +1,5 @@
+export * as Database from "./database"
+
 import { EffectDrizzleSqlite } from "@opencode-ai/effect-drizzle-sqlite"
 import { layer as sqliteLayer } from "#sqlite"
 import { Context, Effect, Layer } from "effect"
@@ -6,7 +8,7 @@ import { Flag } from "../flag/flag"
 import { isAbsolute, join } from "path"
 import { DatabaseMigration } from "./migration"
 import { InstallationChannel } from "../installation/version"
-import { LayerNode } from "../effect/layer-node"
+import { makeGlobalNode } from "../effect/app-node"
 
 const makeDatabase = EffectDrizzleSqlite.makeWithDefaults()
 type DatabaseShape = Effect.Success<typeof makeDatabase>
@@ -17,7 +19,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/v2/storage/Database") {}
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const db = yield* makeDatabase
@@ -52,15 +54,4 @@ export function path() {
   return join(Global.Path.data, `opencode-${InstallationChannel.replace(/[^a-zA-Z0-9._-]/g, "-")}.db`)
 }
 
-export const defaultLayer = Layer.unwrap(
-  Effect.gen(function* () {
-    return layerFromPath(path())
-  }),
-).pipe(Layer.provide(Global.defaultLayer))
-
-export const node = LayerNode.make(layerFromPath(path()), [])
-
-// 别名：让 `import { Database } from "..."` 后能用 Database.Service / .defaultLayer / .node
-// 旧写法 `export { Service as Database }` 只把 Service 类重命名为 Database，但 defaultLayer/node 是顶层 const，无法作为 Service 类的属性
-// 所以用一个对象把三者打包后作为 Database 导出
-export const Database = { Service, defaultLayer, node }
+export const node = makeGlobalNode({ service: Service, layer: layerFromPath(path()), deps: [] })

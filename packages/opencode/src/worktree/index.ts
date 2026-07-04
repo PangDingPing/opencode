@@ -1,44 +1,24 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { path } from "@opencode-ai/core/effect/layer-node-platform"
+import { path } from "@opencode-ai/core/effect/app-node-platform"
 import { Global } from "@opencode-ai/core/global"
-import { InstanceLayer } from "@/project/instance-layer"
 import { InstanceStore } from "@/project/instance-store"
 import { Project } from "@/project/project"
-import {
-  defaultLayer as DatabaseDefaultLayer,
-  node as DatabaseNode,
-  Service as DatabaseService,
-} from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
 import { ProjectTable } from "@opencode-ai/core/project/sql"
 import type { ProjectV2 } from "@opencode-ai/core/project"
 import { Slug } from "@opencode-ai/core/util/slug"
 import { errorMessage } from "../util/error"
-import { EventV2 } from "@opencode-ai/core/event"
 import { GlobalBus } from "@/bus/global"
 import { Git } from "@/git"
 import { Effect, Layer, Path, Schema, Scope, Context } from "effect"
 import { ChildProcess } from "effect/unstable/process"
-import { NodePath } from "@effect/platform-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppProcess } from "@opencode-ai/core/process"
 import { InstanceState } from "@/effect/instance-state"
+import { WorktreeEvent } from "@opencode-ai/schema/worktree-event"
 
-export const Event = {
-  Ready: EventV2.define({
-    type: "worktree.ready",
-    schema: {
-      name: Schema.String,
-      branch: Schema.optional(Schema.String),
-    },
-  }),
-  Failed: EventV2.define({
-    type: "worktree.failed",
-    schema: {
-      message: Schema.String,
-    },
-  }),
-}
+export const Event = WorktreeEvent
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -149,7 +129,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Wo
 
 type GitResult = { code: number; text: string; stderr: string }
 
-export const layer: Layer.Layer<
+const layer: Layer.Layer<
   Service,
   never,
   | FSUtil.Service
@@ -158,7 +138,7 @@ export const layer: Layer.Layer<
   | Git.Service
   | Project.Service
   | InstanceStore.Service
-  | DatabaseService
+  | Database.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -166,7 +146,7 @@ export const layer: Layer.Layer<
     const fs = yield* FSUtil.Service
     const pathSvc = yield* Path.Path
     const appProcess = yield* AppProcess.Service
-    const { db } = yield* DatabaseService
+    const { db } = yield* Database.Service
     const gitSvc = yield* Git.Service
     const project = yield* Project.Service
     const store = yield* InstanceStore.Service
@@ -634,25 +614,10 @@ export const layer: Layer.Layer<
   }),
 )
 
-export const appLayer = layer.pipe(
-  Layer.provide(Git.defaultLayer),
-  Layer.provide(AppProcess.defaultLayer),
-  Layer.provide(Project.defaultLayer),
-  Layer.provide(DatabaseDefaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(NodePath.layer),
-)
-
-export const defaultLayer = appLayer.pipe(Layer.provide(InstanceLayer.layer))
-
-export const node = LayerNode.make(layer, [
-  FSUtil.node,
-  path,
-  AppProcess.node,
-  Git.node,
-  Project.node,
-  InstanceStore.node,
-  DatabaseNode,
-])
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [FSUtil.node, path, AppProcess.node, Git.node, Project.node, InstanceStore.node, Database.node],
+})
 
 export * as Worktree from "."

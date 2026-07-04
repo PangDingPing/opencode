@@ -1,5 +1,4 @@
-import { EventV2 } from "@opencode-ai/core/event"
-import { SessionID, MessageID, PartID } from "./schema"
+import { SessionID, MessageID } from "./schema"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import {
@@ -12,17 +11,15 @@ import {
   Info,
   OutputLengthError,
   Part,
-  StructuredOutputError,
   SubtaskPart,
   User,
   WithParts,
-  type ToolPart,
 } from "@opencode-ai/core/v1/session"
 
 import { NamedError } from "@opencode-ai/core/util/error"
 import { APICallError, convertToModelMessages, LoadAPIKeyError, type ModelMessage, type UIMessage } from "ai"
-import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
-import { Service as DatabaseService } from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { NotFoundError } from "@/storage/storage"
 import { and } from "drizzle-orm"
 import { desc } from "drizzle-orm"
@@ -59,16 +56,7 @@ export const Event = {
   Updated: SessionV1.Event.MessageUpdated,
   Removed: SessionV1.Event.MessageRemoved,
   PartUpdated: SessionV1.Event.PartUpdated,
-  PartDelta: EventV2.define({
-    type: "message.part.delta",
-    schema: {
-      sessionID: SessionID,
-      messageID: MessageID,
-      partID: PartID,
-      field: Schema.String,
-      delta: Schema.String,
-    },
-  }),
+  PartDelta: SessionV1.Event.PartDelta,
   PartRemoved: SessionV1.Event.PartRemoved,
 }
 
@@ -107,7 +95,7 @@ const part = (row: typeof PartTable.$inferSelect) =>
 const older = (row: Cursor) =>
   or(lt(MessageTable.time_created, row.time), and(eq(MessageTable.time_created, row.time), lt(MessageTable.id, row.id)))
 
-function hydrate(db: DatabaseInterface["db"], rows: (typeof MessageTable.$inferSelect)[]) {
+function hydrate(db: Database.Interface["db"], rows: (typeof MessageTable.$inferSelect)[]) {
   const ids = rows.map((row) => row.id)
   const partByMessage = new Map<string, Part[]>()
   return Effect.gen(function* () {
@@ -439,7 +427,7 @@ export const page = Effect.fn("MessageV2.page")(function* (input: {
   limit: number
   before?: string
 }) {
-  const { db } = yield* DatabaseService
+  const { db } = yield* Database.Service
   const before = input.before ? cursor.decode(input.before) : undefined
   const where = before
     ? and(eq(MessageTable.session_id, input.sessionID), older(before))
@@ -503,7 +491,7 @@ export function stream(sessionID: SessionID) {
 
 export function parts(messageID: MessageID) {
   return Effect.gen(function* () {
-    const { db } = yield* DatabaseService
+    const { db } = yield* Database.Service
     const rows = yield* db
       .select()
       .from(PartTable)
@@ -516,10 +504,10 @@ export function parts(messageID: MessageID) {
 }
 
 export const get = Effect.fn("MessageV2.get")(function* (input: { sessionID: SessionID; messageID: MessageID }) {
-  const { db } = yield* DatabaseService
-    return yield* db
-      .select()
-      .from(MessageTable)
+  const { db } = yield* Database.Service
+  const row = yield* db
+    .select()
+    .from(MessageTable)
     .where(and(eq(MessageTable.id, input.messageID), eq(MessageTable.session_id, input.sessionID)))
     .get()
     .pipe(Effect.orDie)
@@ -743,3 +731,4 @@ export function fromError(
 }
 
 export * as MessageV2 from "./message-v2"
+export const node = LayerNode.group([Database.node])

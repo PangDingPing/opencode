@@ -1,14 +1,9 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { httpClient } from "@opencode-ai/core/effect/layer-node-platform"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Context, Effect, FiberMap, Iterable, Layer, Schema, Stream } from "effect"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientRequest } from "effect/unstable/http"
-import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
-import {
-  defaultLayer as DatabaseDefaultLayer,
-  node as DatabaseNode,
-  Service as DatabaseService,
-} from "@opencode-ai/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { asc } from "drizzle-orm"
 import { eq } from "drizzle-orm"
 import { inArray } from "drizzle-orm"
@@ -36,8 +31,9 @@ import { waitEvent } from "./util"
 import { WorkspaceRef } from "@/effect/instance-ref"
 import { Vcs } from "@/project/vcs"
 import { InstanceStore } from "@/project/instance-store"
-import { InstanceBootstrap } from "@/project/bootstrap"
 import { WorkspaceAdapterRuntime } from "./workspace-adapter-runtime"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
+import { WorkspaceEvent } from "@opencode-ai/schema/workspace-event"
 
 export const Info = Schema.Struct({
   ...WorkspaceInfoSchema.fields,
@@ -45,27 +41,10 @@ export const Info = Schema.Struct({
 }).annotate({ identifier: "Workspace" })
 export type Info = WorkspaceInfo & { timeUsed: number }
 
-export const ConnectionStatus = Schema.Struct({
-  workspaceID: WorkspaceV2.ID,
-  status: Schema.Literals(["connected", "connecting", "disconnected", "error"]),
-})
-export type ConnectionStatus = Schema.Schema.Type<typeof ConnectionStatus>
+export const ConnectionStatus = WorkspaceEvent.ConnectionStatus
+export type ConnectionStatus = WorkspaceEvent.ConnectionStatus
 
-export const Event = {
-  Ready: EventV2.define({
-    type: "workspace.ready",
-    schema: {
-      name: Schema.String,
-    },
-  }),
-  Failed: EventV2.define({
-    type: "workspace.failed",
-    schema: {
-      message: Schema.String,
-    },
-  }),
-  Status: EventV2.define({ type: "workspace.status", schema: ConnectionStatus.fields }),
-}
+export const Event = WorkspaceEvent
 
 function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
   return {
@@ -136,7 +115,7 @@ export class SyncTimeoutError extends Schema.TaggedErrorClass<SyncTimeoutError>(
 
 export class SyncAbortedError extends Schema.TaggedErrorClass<SyncAbortedError>()("WorkspaceSyncAbortedError", {
   message: Schema.String,
-  cause: Schema.optional(Schema.Defect),
+  cause: Schema.optional(Schema.Defect()),
 }) {}
 
 type CreateError = Auth.AuthError
@@ -171,7 +150,7 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Wo
 
 export const use = serviceUse(Service)
 
-export const layer = Layer.effect(
+const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const auth = yield* Auth.Service
@@ -182,7 +161,7 @@ export const layer = Layer.effect(
     const vcs = yield* Vcs.Service
     const flags = yield* RuntimeFlags.Service
     const fs = yield* FSUtil.Service
-    const { db } = yield* DatabaseService
+    const { db } = yield* Database.Service
     const connections = new Map<WorkspaceV2.ID, ConnectionStatus>()
     const syncFibers = yield* FiberMap.make<WorkspaceV2.ID, void, SyncLoopError>()
 
@@ -622,7 +601,7 @@ export const layer = Layer.effect(
                   }),
                 fallback: "",
                 response: "text",
-              }).pipe(Effect.provide(InstanceStore.defaultLayer.pipe(Layer.provide(InstanceBootstrap.defaultLayer))))
+              }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
             : ""
 
         if (sourcePatch) {
@@ -638,7 +617,7 @@ export const layer = Layer.effect(
                 body: HttpBody.jsonUnsafe({ patch: sourcePatch }),
               }),
             fallback: { applied: false },
-          }).pipe(Effect.provide(InstanceStore.defaultLayer.pipe(Layer.provide(InstanceBootstrap.defaultLayer))))
+          }).pipe(Effect.provide(AppNodeBuilderV1.build(InstanceStore.node)))
         }
 
         if (input.workspaceID === null) {
@@ -906,19 +885,6 @@ export const layer = Layer.effect(
   }),
 )
 
-export const defaultLayer = layer.pipe(
-  Layer.provide(Auth.defaultLayer),
-  Layer.provide(Session.defaultLayer),
-  Layer.provide(SessionPrompt.defaultLayer),
-  Layer.provide(Project.defaultLayer),
-  Layer.provide(Vcs.defaultLayer),
-  Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(DatabaseDefaultLayer),
-  Layer.provide(EventV2Bridge.defaultLayer),
-  Layer.provide(FetchHttpClient.layer),
-  Layer.provide(RuntimeFlags.defaultLayer),
-)
-
 const TIMEOUT = 5000
 
 type HistoryEvent = {
@@ -930,7 +896,7 @@ type HistoryEvent = {
 }
 
 function waitUntilSynced(input: {
-  db: DatabaseInterface["db"]
+  db: Database.Interface["db"]
   workspaceID: WorkspaceV2.ID
   state: Record<string, number>
   signal?: AbortSignal
@@ -950,7 +916,7 @@ function waitUntilSynced(input: {
   )
 }
 
-function synced(db: DatabaseInterface["db"], state: Record<string, number>): Effect.Effect<boolean> {
+function synced(db: Database.Interface["db"], state: Record<string, number>): Effect.Effect<boolean> {
   const ids = Object.keys(state)
   if (ids.length === 0) return Effect.succeed(true)
 
@@ -979,16 +945,20 @@ function route(url: string | URL, path: string) {
   return next
 }
 
-export const node = LayerNode.make(layer, [
-  Auth.node,
-  Session.node,
-  SessionPrompt.node,
-  httpClient,
-  EventV2Bridge.node,
-  Vcs.node,
-  RuntimeFlags.node,
-  FSUtil.node,
-  DatabaseNode,
-])
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [
+    Auth.node,
+    Session.node,
+    SessionPrompt.node,
+    httpClient,
+    EventV2Bridge.node,
+    Vcs.node,
+    RuntimeFlags.node,
+    FSUtil.node,
+    Database.node,
+  ],
+})
 
 export * as Workspace from "./workspace"
