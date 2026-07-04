@@ -41,7 +41,7 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
+import { PermissionNotFoundError, notFound as notFoundError } from "../errors"
 import * as SessionError from "./session-errors"
 
 const tryParseJson = (text: string) =>
@@ -88,7 +88,24 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const requireSession = Effect.fn("SessionHttpApi.requireSession")(function* (sessionID: SessionID) {
-      return yield* SessionError.mapStorageNotFound(session.get(sessionID))
+      const info = yield* SessionError.mapStorageNotFound(session.get(sessionID))
+      // yejian: 普通 user 只能访问自己的 session，admin 可访问全部。
+      // 伪装成 not found，不暴露 session 存在，前端自动跳转新建会话页。
+      const user = yield* CurrentUser
+      if (user.role !== "admin") {
+        const { db } = yield* Database.Service
+        const row = yield* db
+          .select({ user_id: SessionTable.user_id })
+          .from(SessionTable)
+          .where(eq(SessionTable.id, sessionID))
+          .get()
+          .pipe(Effect.orDie)
+        const ownerID = row?.user_id
+        if (ownerID && ownerID !== user.id) {
+          yield* Effect.fail(notFoundError(`Session not found: ${sessionID}`))
+        }
+      }
+      return info
     })
 
     const get = Effect.fn("SessionHttpApi.get")(function* (ctx: { params: { sessionID: SessionID } }) {

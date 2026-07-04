@@ -179,6 +179,12 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
   const language = useLanguage()
   const server = useServer()
   const tabs = useTabs()
+  const navigate = useNavigate()
+  // yejian: session 不存在或无权访问时，自动跳转新建会话页（不显示错误页）
+  const isNotFound = isCurrentSessionNotFoundError(props.error, props.sessionID)
+  onMount(() => {
+    if (isNotFound) navigate("/new-session")
+  })
   const displayServer = createMemo(() => {
     const key = props.serverKey ?? server.key
     const conn = server.list.find((item) => ServerConnection.key(item) === key)
@@ -188,32 +194,9 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
     if (!props.sessionID) return
     tabs.removeSessionTab({ server: props.serverKey ?? server.key, sessionId: props.sessionID })
   }
-  if (isCurrentSessionNotFoundError(props.error, props.sessionID)) {
-    return (
-      <div class="flex-1 min-h-0 overflow-hidden">
-        <div class="h-full px-6 pb-42 -mt-4 flex flex-col items-center justify-center text-center gap-4">
-          <div class="flex flex-col items-center gap-2">
-            <div class="text-16-medium text-text max-w-md">{language.t("session.error.notFound")}</div>
-            <div class="text-13-regular text-text-weak max-w-md">
-              {language.t("session.error.notFound.description")}
-            </div>
-          </div>
-          <Show when={props.sessionID}>
-            {(sessionID) => (
-              <div class="max-w-full flex flex-col items-center gap-1">
-                <div class="max-w-full text-11-regular text-text-faint break-all">{displayServer()}</div>
-                <code class="max-w-full rounded-[4px] px-1 py-0.5 font-mono text-xs font-medium leading-4 text-text-base break-all bg-[color-mix(in_oklch,var(--v2-text-text-base)_8%,transparent)]">
-                  {sessionID()}
-                </code>
-              </div>
-            )}
-          </Show>
-          <ButtonV2 variant="neutral" size="normal" icon="xmark-small" onClick={closeTab}>
-            {language.t("session.error.notFound.closeTab")}
-          </ButtonV2>
-        </div>
-      </div>
-    )
+  if (isNotFound) {
+    // yejian: 跳转中显示空白，避免闪烁错误页
+    return <div class="flex-1 min-h-0 overflow-hidden" />
   }
   return <ErrorPage error={props.error} />
 }
