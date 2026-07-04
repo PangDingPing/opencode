@@ -43,6 +43,7 @@ import { PermissionProvider } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
+import { AuthGate } from "@/context/auth"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
 import { SDKProvider, useSDK } from "@/context/sdk"
@@ -492,7 +493,8 @@ export function AppInterface(props: {
       <GlobalProvider>
         <SettingsProvider>
           <ConnectionGate disableHealthCheck={props.disableHealthCheck}>
-            <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
+            <AuthGate>
+              <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
               <Dynamic
                 component={props.router ?? Router}
                 root={(routerProps) => (
@@ -510,6 +512,7 @@ export function AppInterface(props: {
                 <Routes />
               </Dynamic>
             </Show>
+            </AuthGate>
           </ConnectionGate>
         </SettingsProvider>
       </GlobalProvider>
