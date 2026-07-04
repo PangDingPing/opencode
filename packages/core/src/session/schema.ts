@@ -8,6 +8,7 @@ import { externalID, type ExternalID, RelativePath, optionalOmitUndefined, withS
 import { Identifier } from "../util/identifier"
 import { V2Schema } from "../v2-schema"
 import { AgentV2 } from "../agent"
+import { UserID } from "../user/sql"
 
 export const ID = Schema.String.check(Schema.isStartsWith("ses")).pipe(
   Schema.brand("SessionID"),
@@ -26,6 +27,7 @@ export class Info extends Schema.Class<Info>("SessionV2.Info")({
   id: ID,
   parentID: ID.pipe(optionalOmitUndefined),
   projectID: ProjectV2.ID,
+  userID: UserID.pipe(optionalOmitUndefined),
   agent: AgentV2.ID.pipe(Schema.optional),
   model: ModelV2.Ref.pipe(Schema.optional),
   cost: Schema.Finite,

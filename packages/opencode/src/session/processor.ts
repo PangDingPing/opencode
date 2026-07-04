@@ -23,7 +23,11 @@ import { Question } from "@/question"
 import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
-import { Database } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { SessionEvent } from "@opencode-ai/core/session/event"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -105,7 +109,7 @@ export const layer = Layer.effect(
     const image = yield* Image.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
-    const database = yield* Database.Service
+    const database = yield* DatabaseService
 
     const create = Effect.fn("SessionProcessor.create")(function* (input: Input) {
       // Pre-capture snapshot before the LLM stream starts. The AI SDK
@@ -517,7 +521,7 @@ export const layer = Layer.effect(
             }))
 
             const parts = yield* MessageV2.parts(ctx.assistantMessage.id).pipe(
-              Effect.provideService(Database.Service, database),
+              Effect.provideService(DatabaseService, database),
             )
             const recentParts = parts.slice(-DOOM_LOOP_THRESHOLD)
 
@@ -1060,7 +1064,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(Image.defaultLayer),
     Layer.provide(Config.defaultLayer),
     Layer.provide(RuntimeFlags.defaultLayer),
-    Layer.provide(Database.defaultLayer),
+    Layer.provide(DatabaseDefaultLayer),
     Layer.provide(EventV2Bridge.defaultLayer),
   ),
 )
@@ -1078,7 +1082,7 @@ export const node = LayerNode.make(layer, [
   Image.node,
   EventV2Bridge.node,
   RuntimeFlags.node,
-  Database.node,
+  DatabaseNode,
 ])
 
 export * as SessionProcessor from "./processor"

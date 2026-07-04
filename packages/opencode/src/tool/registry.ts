@@ -10,7 +10,7 @@ import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
-import { Database } from "@opencode-ai/core/database/database"
+import { defaultLayer as DatabaseDefaultLayer, node as DatabaseNode } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
@@ -336,7 +336,7 @@ export const defaultLayer = Layer.suspend(() =>
       Layer.provide(CrossSpawnSpawner.defaultLayer),
       Layer.provide(Truncate.defaultLayer),
     )
-    .pipe(Layer.provide(Database.defaultLayer), Layer.provide(RuntimeFlags.defaultLayer)),
+    .pipe(Layer.provide(DatabaseDefaultLayer), Layer.provide(RuntimeFlags.defaultLayer)),
 )
 
 function isZodType(value: unknown): value is z.ZodType {
@@ -434,7 +434,7 @@ export const node = LayerNode.make(layer.pipe(Layer.provide(Ripgrep.defaultLayer
   Format.node,
   Truncate.node,
   RuntimeFlags.node,
-  Database.node,
+  DatabaseNode,
 ])
 
 export * as ToolRegistry from "./registry"

@@ -1,6 +1,9 @@
 import { SessionV2 } from "@opencode-ai/core/session"
 import { LocationServiceMap } from "@opencode-ai/core/location-layer"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
+import { defaultLayer as DatabaseDefaultLayer } from "@opencode-ai/core/database/database"
+import { defaultLayer as UserDefaultLayer } from "@opencode-ai/core/user"
+import { defaultLayer as AuthTokenDefaultLayer } from "@opencode-ai/core/auth-token"
 import { Layer } from "effect"
 import { layer as locationLayer } from "./groups/location"
 import { sessionLocationLayer } from "./middleware/session-location"
@@ -23,9 +26,13 @@ import { IntegrationHandler } from "./handlers/integration"
 import { CredentialHandler } from "./handlers/credential"
 import { Credential } from "@opencode-ai/core/credential"
 import { ProjectCopyHandler } from "./handlers/project-copy"
+import { AuthHandler } from "./handlers/auth"
+import { AdminHandler } from "./handlers/admin"
 
 export const handlers = Layer.mergeAll(
   HealthHandler,
+  AuthHandler,
+  AdminHandler,
   LocationHandler,
   AgentHandler,
   SessionHandler,
@@ -50,4 +57,6 @@ export const handlers = Layer.mergeAll(
   Layer.provide(PermissionSaved.defaultLayer),
   Layer.provide(LocationServiceMap.layer),
   Layer.provide(Credential.defaultLayer),
+  Layer.provide(Layer.merge(UserDefaultLayer, DatabaseDefaultLayer)),
+  Layer.provide(Layer.merge(AuthTokenDefaultLayer, DatabaseDefaultLayer)),
 )

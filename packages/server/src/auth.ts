@@ -1,3 +1,7 @@
+/**
+ * @deprecated Web 端已不再使用 Basic Auth，所有请求必须通过 cookie 认证（登录后生成的 session token）。
+ * 此模块仅保留给 CLI 用户使用 Basic Auth 向后兼容。
+ */
 export * as ServerAuth from "./auth"
 
 import { Config as EffectConfig, Context, Effect, Layer, Option, Redacted } from "effect"

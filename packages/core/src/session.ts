@@ -29,6 +29,7 @@ import { logFailure } from "./session/logging"
 import { MessageDecodeError } from "./session/error"
 import { SessionEvent } from "./session/event"
 import { SessionInput } from "./session/input"
+import { UserID } from "./user/sql"
 
 // get project -> project.locations
 //
@@ -52,6 +53,7 @@ const ListInputBase = {
   limit: PositiveInt.pipe(Schema.optional),
   order: Schema.Literals(["asc", "desc"]).pipe(Schema.optional),
   anchor: ListAnchor.pipe(Schema.optional),
+  userID: UserID.pipe(Schema.optional),
 }
 
 const ListDirectoryInput = Schema.Struct({
@@ -75,6 +77,7 @@ type CreateInput = {
   agent?: AgentV2.ID
   model?: ModelV2.Ref
   location: Location.Ref
+  userID?: UserID
 }
 
 type CompactInput = {
@@ -215,6 +218,7 @@ export const layer = Layer.effect(
           version: InstallationVersion,
           projectID: project.id,
           directory: input.location.directory,
+          user_id: input.userID,
           path: path.relative(project.directory, input.location.directory).replaceAll("\\", "/"),
           workspaceID: input.location.workspaceID ? WorkspaceV2.ID.make(input.location.workspaceID) : undefined,
           title: `New session - ${new Date(now).toISOString()}`,
@@ -267,6 +271,7 @@ export const layer = Layer.effect(
         if (input.workspaceID) conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
         if ("project" in input) conditions.push(eq(SessionTable.project_id, input.project))
         if (input.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
+        if (input.userID) conditions.push(eq(SessionTable.user_id, input.userID))
         if (input.anchor) {
           conditions.push(
             order === "asc"

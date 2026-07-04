@@ -65,6 +65,7 @@ export default {
           \`connector_id\` text,
           \`method_id\` text,
           \`active\` integer,
+          \`user_id\` text,
           \`time_created\` integer NOT NULL,
           \`time_updated\` integer NOT NULL
         );
@@ -186,6 +187,7 @@ export default {
           \`id\` text PRIMARY KEY,
           \`project_id\` text NOT NULL,
           \`workspace_id\` text,
+          \`user_id\` text,
           \`parent_id\` text,
           \`slug\` text NOT NULL,
           \`directory\` text NOT NULL,
@@ -271,7 +273,37 @@ export default {
       yield* tx.run(`CREATE INDEX \`session_project_idx\` ON \`session\` (\`project_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_workspace_idx\` ON \`session\` (\`workspace_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_parent_idx\` ON \`session\` (\`parent_id\`);`)
+      yield* tx.run(`CREATE INDEX \`session_user_id_idx\` ON \`session\` (\`user_id\`);`)
       yield* tx.run(`CREATE INDEX \`todo_session_idx\` ON \`todo\` (\`session_id\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`user\` (
+          \`id\` text PRIMARY KEY,
+          \`username\` text NOT NULL,
+          \`password_hash\` text NOT NULL,
+          \`role\` text NOT NULL,
+          \`display_name\` text,
+          \`disabled\` integer DEFAULT 0 NOT NULL,
+          \`must_change_password\` integer DEFAULT 0 NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`CREATE UNIQUE INDEX \`user_username_idx\` ON \`user\` (\`username\`);`)
+      yield* tx.run(`
+        CREATE TABLE \`session_token\` (
+          \`id\` text PRIMARY KEY,
+          \`user_id\` text NOT NULL,
+          \`expires_at\` integer NOT NULL,
+          \`last_extend_at\` integer NOT NULL,
+          \`revoked_at\` integer,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL,
+          \`user_agent\` text,
+          \`ip\` text,
+          CONSTRAINT \`fk_session_token_user_id_user_id_fk\` FOREIGN KEY (\`user_id\`) REFERENCES \`user\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`CREATE INDEX \`session_token_user_idx\` ON \`session_token\` (\`user_id\`);`)
     })
   },
 } satisfies Omit<DatabaseMigration.Migration, "id">

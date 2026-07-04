@@ -4,10 +4,23 @@ import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "e
 import { HttpApiError, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { hasPtyConnectTicketURL } from "@/server/shared/pty-ticket"
 import { isPublicUIPath } from "@/server/shared/public-ui"
+import { CurrentUser, SESSION_COOKIE } from "@opencode-ai/server/middleware/auth"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 export {
   Authorization as ServerAuthorization,
   authorizationLayer as serverAuthorizationLayer,
 } from "@opencode-ai/server/middleware/authorization"
+
+// 从 cookie 头解析 oc_session token
+function parseCookieToken(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(";")) {
+    const [key, ...valueParts] = part.trim().split("=")
+    if (key === SESSION_COOKIE) return valueParts.join("=")
+  }
+  return null
+}
 
 const AUTH_TOKEN_QUERY = "auth_token"
 const UNAUTHORIZED = 401
@@ -119,13 +132,58 @@ export const authorizationLayer = Layer.effect(
   Authorization,
   Effect.gen(function* () {
     const config = yield* ServerAuth.Config
-    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
+
+    // 获取 User/AuthToken service 用于 cookie 认证
+    const userSvc = yield* User.Service
+    const tokenSvc = yield* AuthToken.Service
+
     return Authorization.of((effect) =>
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
-        return yield* credentialFromRequest(request).pipe(
-          Effect.flatMap((credential) => validateCredential(effect, credential, config)),
-        )
+
+        // 1. 先检查 cookie（web 用户）—— SDK 跨域请求会带 oc_session cookie
+        //    无论是否设置 OPENCODE_SERVER_PASSWORD，cookie 认证始终生效
+        const cookieToken = parseCookieToken(request.headers.cookie)
+        if (cookieToken) {
+          const tokenInfo = yield* tokenSvc.verify(cookieToken).pipe(
+            Effect.catch(() => Effect.succeed(null)),
+          )
+          if (tokenInfo) {
+            const user = yield* userSvc.getUser(tokenInfo.userId).pipe(
+              Effect.catch(() => Effect.succeed(null)),
+            )
+            if (user && user.disabled === 0) {
+              // 惰性续期
+              yield* tokenSvc.extend(cookieToken).pipe(Effect.catch(() => Effect.void))
+              return yield* effect.pipe(Effect.provideService(CurrentUser, user))
+            }
+          }
+        }
+
+        // 2. 检查 Basic Auth（CLI 用户）—— 仅在设置了 OPENCODE_SERVER_PASSWORD 时生效
+        if (ServerAuth.required(config)) {
+          const credential = yield* credentialFromRequest(request)
+          if (ServerAuth.authorized(credential, config)) {
+            const cliUser = {
+              id: "usr_cli",
+              username: config.username,
+              role: "admin" as const,
+              display_name: "CLI",
+              disabled: 0,
+              must_change_password: 0,
+              time_created: 0,
+              time_updated: 0,
+            }
+            return yield* effect.pipe(Effect.provideService(CurrentUser, cliUser))
+          }
+          // 设置了密码但 Basic Auth 也失败 → 带 www-authenticate 头促使浏览器弹框
+          yield* HttpEffect.appendPreResponseHandler((_request, response) =>
+            Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),
+          )
+        }
+
+        // 3. 都没有，返回 401（无密码时不带 www-authenticate 头，避免浏览器弹 Basic Auth 框）
+        return yield* new HttpApiError.Unauthorized({})
       }),
     )
   }),

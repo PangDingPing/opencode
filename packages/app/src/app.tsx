@@ -32,6 +32,7 @@ import { CommentsProvider } from "@/context/comments"
 import { FileProvider } from "@/context/file"
 import { ServerSDKProvider } from "@/context/server-sdk"
 import { ServerSyncProvider } from "@/context/server-sync"
+import { AuthGate } from "@/context/auth"
 import { GlobalProvider } from "@/context/global"
 import { HighlightsProvider } from "@/context/highlights"
 import { LanguageProvider, type Locale, useLanguage } from "@/context/language"
@@ -55,6 +56,8 @@ const HomeRoute = lazy(() => import("@/pages/home"))
 const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
 const SkillsPanel = lazy(() => import("@/components/skills-panel"))
+const UsersAdminPage = lazy(() => import("@/pages/admin/users"))
+const UserSettingsPage = lazy(() => import("@/pages/settings"))
 
 const SessionRoute = Object.assign(
   () => {
@@ -395,29 +398,33 @@ export function AppInterface(props: {
     >
       <GlobalProvider>
         <ConnectionGate disableHealthCheck={props.disableHealthCheck}>
-          <Dynamic
-            component={props.router ?? Router}
-            root={(routerProps) => (
-              <TabsProvider>
-                <ServerKey>
-                  <QueryProvider>
-                    <ServerSDKProvider>
-                      <ServerSyncProvider>
-                        <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>
-                      </ServerSyncProvider>
-                    </ServerSDKProvider>
-                  </QueryProvider>
-                </ServerKey>
-              </TabsProvider>
-            )}
-          >
-            <Route path="/" component={HomeRoute} />
-            <Route path="/new-session" component={DraftRoute} />
-            <Route path="/:dir" component={DirectoryLayout}>
-              <Route path="/" component={() => <Navigate href="session" />} />
-              <Route path="/session/:id?" component={SessionRoute} />
-            </Route>
-          </Dynamic>
+          <AuthGate>
+            <Dynamic
+              component={props.router ?? Router}
+              root={(routerProps) => (
+                <TabsProvider>
+                  <ServerKey>
+                    <QueryProvider>
+                      <ServerSDKProvider>
+                        <ServerSyncProvider>
+                          <RouterRoot appChildren={props.children}>{routerProps.children}</RouterRoot>
+                        </ServerSyncProvider>
+                      </ServerSDKProvider>
+                    </QueryProvider>
+                  </ServerKey>
+                </TabsProvider>
+              )}
+            >
+              <Route path="/" component={HomeRoute} />
+              <Route path="/new-session" component={DraftRoute} />
+              <Route path="/:dir" component={DirectoryLayout}>
+                <Route path="/" component={() => <Navigate href="session" />} />
+                <Route path="/session/:id?" component={SessionRoute} />
+              </Route>
+              <Route path="/admin/users" component={UsersAdminPage} />
+              <Route path="/settings" component={UserSettingsPage} />
+            </Dynamic>
+          </AuthGate>
         </ConnectionGate>
       </GlobalProvider>
     </ServerProvider>

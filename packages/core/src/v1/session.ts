@@ -12,6 +12,7 @@ import { NonNegativeInt } from "../schema"
 import { NamedError } from "../util/error"
 import { SessionSchema } from "../session/schema"
 import { WorkspaceV2 } from "../workspace"
+import { UserID } from "../user/sql"
 
 const Timestamp = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))
 
@@ -547,6 +548,7 @@ export const SessionInfo = Schema.Struct({
   slug: Schema.String,
   projectID: ProjectV2.ID,
   workspaceID: optionalOmitUndefined(WorkspaceV2.ID),
+  user_id: optionalOmitUndefined(UserID),
   directory: Schema.String,
   path: optionalOmitUndefined(Schema.String),
   parentID: optionalOmitUndefined(SessionSchema.ID),

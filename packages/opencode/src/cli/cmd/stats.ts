@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { effectCmd } from "../effect-cmd"
 import { Session } from "@/session/session"
 import { NotFoundError } from "@/storage/storage"
-import { Database } from "@opencode-ai/core/database/database"
+import { Service as DatabaseService } from "@opencode-ai/core/database/database"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { Project } from "@/project/project"
 import { InstanceRef } from "@/effect/instance-ref"
@@ -81,7 +81,7 @@ export const StatsCommand = effectCmd({
 })
 
 const getAllSessions = Effect.fnUntraced(function* () {
-  const { db } = yield* Database.Service
+  const { db } = yield* DatabaseService
   return (yield* db.select().from(SessionTable).all().pipe(Effect.orDie)).map((row) => Session.fromRow(row))
 })
 

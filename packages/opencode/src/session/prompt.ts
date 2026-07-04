@@ -48,7 +48,11 @@ import { TaskTool, type TaskPromptOps } from "@/tool/task"
 import { SessionRunState } from "./run-state"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
-import { Database } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { SessionEvent } from "@opencode-ai/core/session/event"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -123,7 +127,7 @@ export const layer = Layer.effect(
     const llm = yield* LLM.Service
     const events = yield* EventV2Bridge.Service
     const flags = yield* RuntimeFlags.Service
-    const database = yield* Database.Service
+    const database = yield* DatabaseService
     const { db } = database
     const ops = Effect.fn("SessionPrompt.ops")(function* () {
       return {
@@ -1143,7 +1147,7 @@ export const layer = Layer.effect(
           yield* Effect.logInfo("loop", { "session.id": sessionID, step })
 
           let msgs = yield* MessageV2.filterCompactedEffect(sessionID).pipe(
-            Effect.provideService(Database.Service, database),
+            Effect.provideService(DatabaseService, database),
           )
 
           const { user: lastUser, assistant: lastAssistant, finished: lastFinished, tasks } = MessageV2.latest(msgs)
@@ -1576,7 +1580,7 @@ export const defaultLayer = Layer.suspend(() =>
     Layer.provide(
       Layer.mergeAll(
         Agent.defaultLayer,
-        Database.defaultLayer,
+        DatabaseDefaultLayer,
         SystemPrompt.defaultLayer,
         LLM.defaultLayer,
         CrossSpawnSpawner.defaultLayer,
@@ -1716,7 +1720,7 @@ export const node = LayerNode.make(layer, [
   LLM.node,
   EventV2Bridge.node,
   RuntimeFlags.node,
-  Database.node,
+  DatabaseNode,
 ])
 
 export * as SessionPrompt from "./prompt"

@@ -7,6 +7,7 @@ import { IntegrationSchema } from "./integration/schema"
 import { NonNegativeInt, withStatics } from "./schema"
 import { Identifier } from "./util/identifier"
 import { CredentialTable } from "./credential/sql"
+import { UserID } from "./user/sql"
 
 export const ID = Schema.String.pipe(
   Schema.brand("Credential.ID"),
@@ -51,6 +52,7 @@ export interface Interface {
     readonly integrationID: IntegrationSchema.ID
     readonly value: Info
     readonly label?: string
+    readonly userID?: UserID
   }) => Effect.Effect<Stored>
   /** Updates the label or secret value of a stored credential. */
   readonly update: (id: ID, updates: Partial<Pick<Stored, "label" | "value">>) => Effect.Effect<void>
@@ -120,6 +122,7 @@ export const layer = Layer.effect(
                   integration_id: credential.integrationID,
                   label: credential.label,
                   value: credential.value,
+                  ...(input.userID ? { user_id: input.userID } : {}),
                 })
                 .run()
             }),

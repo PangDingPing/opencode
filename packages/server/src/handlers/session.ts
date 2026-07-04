@@ -11,6 +11,9 @@ import {
   UnknownError,
 } from "../errors"
 import { AbsolutePath } from "@opencode-ai/core/schema"
+import { CurrentUser } from "../middleware/auth"
+import { mkdir } from "node:fs/promises"
+import path from "path"
 
 const DefaultSessionsLimit = 50
 
@@ -22,16 +25,20 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.list",
         Effect.fn(function* (ctx) {
+          const user = yield* CurrentUser
           const query =
             ctx.query.cursor !== undefined
               ? yield* SessionsCursor.parse(ctx.query.cursor).pipe(
                   Effect.mapError(() => new InvalidCursorError({ message: "Invalid cursor" })),
                 )
               : ctx.query
+          // 普通用户只能看自己的 session，admin 看全部
+          const userID = user.role === "admin" ? undefined : user.id
           const sessions = yield* session.list({
             ...query,
             workspaceID: query.workspace,
             limit: ctx.query.limit ?? DefaultSessionsLimit,
+            ...(userID ? { userID } : {}),
           })
           const first = sessions[0]
           const last = sessions.at(-1)
@@ -65,12 +72,19 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.create",
         Effect.fn(function* (ctx) {
+          const user = yield* CurrentUser
+          // 未指定 location 时，按实名设工作目录（如 /workspace/上官兵/）
+          const directory =
+            ctx.payload.location?.directory ?? AbsolutePath.make(path.join(process.cwd(), user.username))
+          // 确保用户工作目录存在
+          yield* Effect.promise(() => mkdir(path.join(process.cwd(), user.username), { recursive: true }))
           return {
             data: yield* session.create({
               id: ctx.payload.id,
               agent: ctx.payload.agent,
               model: ctx.payload.model,
-              location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
+              location: ctx.payload.location ?? { directory },
+              userID: user.id,
             }),
           }
         }),
@@ -78,18 +92,24 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.get",
         Effect.fn(function* (ctx) {
-          return {
-            data: yield* session.get(ctx.params.sessionID).pipe(
-              Effect.catchTag(
-                "Session.NotFoundError",
-                (error) =>
-                  new SessionNotFoundError({
-                    sessionID: error.sessionID,
-                    message: `Session not found: ${error.sessionID}`,
-                  }),
-              ),
+          const user = yield* CurrentUser
+          const session = yield* session.get(ctx.params.sessionID).pipe(
+            Effect.catchTag(
+              "Session.NotFoundError",
+              (error) =>
+                new SessionNotFoundError({
+                  sessionID: error.sessionID,
+                  message: `Session not found: ${error.sessionID}`,
+                }),
             ),
+          )
+          if (user.role !== "admin" && session.userID !== user.id) {
+            return yield* new SessionNotFoundError({
+              sessionID: ctx.params.sessionID,
+              message: "Session not found",
+            })
           }
+          return { data: session }
         }),
       )
       .handle(

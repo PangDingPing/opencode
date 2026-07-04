@@ -2,6 +2,7 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import { Timestamps } from "../database/schema.sql"
 import type { IntegrationSchema } from "../integration/schema"
 import type { Credential } from "../credential"
+import type { UserID } from "../user/sql"
 
 export const CredentialTable = sqliteTable("credential", {
   id: text().$type<Credential.ID>().primaryKey(),
@@ -11,5 +12,6 @@ export const CredentialTable = sqliteTable("credential", {
   connector_id: text(),
   method_id: text(),
   active: integer({ mode: "boolean" }),
+  user_id: text().$type<UserID>(),
   ...Timestamps,
 })

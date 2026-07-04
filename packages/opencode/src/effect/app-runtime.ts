@@ -3,7 +3,7 @@ import { attach } from "./run-service"
 import * as Observability from "@opencode-ai/core/observability"
 
 import { FSUtil } from "@opencode-ai/core/fs-util"
-import { Database } from "@opencode-ai/core/database/database"
+import { defaultLayer as DatabaseDefaultLayer } from "@opencode-ai/core/database/database"
 import { Auth } from "@/auth"
 import { Account } from "@/account/account"
 import { Config } from "@/config/config"
@@ -55,7 +55,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
   FSUtil.defaultLayer,
-  Database.defaultLayer,
+  DatabaseDefaultLayer,
   Auth.defaultLayer,
   Account.defaultLayer,
   Config.defaultLayer,

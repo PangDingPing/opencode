@@ -1,57 +1,75 @@
-import { ServerAuth } from "../auth"
 import { UnauthorizedError } from "../errors"
-import { Effect, Encoding, Layer, Redacted } from "effect"
-import { HttpEffect, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { Effect, Layer } from "effect"
+import { HttpEffect, HttpServerRequest } from "effect/unstable/http"
+import type { HttpServerResponse } from "effect/unstable/http"
+import * as HttpServerResponseModule from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
+import { Service as UserService } from "@opencode-ai/core/user"
+import { Service as AuthTokenService } from "@opencode-ai/core/auth-token"
+import { CurrentUser, SESSION_COOKIE } from "./auth"
 
-const AUTH_TOKEN_QUERY = "auth_token"
-const WWW_AUTHENTICATE = 'Basic realm="Secure Area"'
+// 不需要认证的路径（登录/登出/健康检查）
+const PUBLIC_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/allowed-names",
+  "/api/health",
+])
 
 export class Authorization extends HttpApiMiddleware.Service<Authorization>()("@opencode/HttpApiAuthorization", {
   error: UnauthorizedError,
 }) {}
 
-function emptyCredential() {
-  return { username: "", password: Redacted.make("") }
-}
-
-function decodeCredential(input: string) {
-  return Effect.fromResult(Encoding.decodeBase64String(input)).pipe(
-    Effect.match({
-      onFailure: emptyCredential,
-      onSuccess: (header) => {
-        const separator = header.indexOf(":")
-        if (separator === -1) return emptyCredential()
-        return { username: header.slice(0, separator), password: Redacted.make(header.slice(separator + 1)) }
-      },
-    }),
-  )
-}
-
-function credentialFromRequest(request: HttpServerRequest.HttpServerRequest) {
-  const url = new URL(request.url, "http://localhost")
-  const token = url.searchParams.get(AUTH_TOKEN_QUERY)
-  if (token) return decodeCredential(token)
-  const match = /^Basic\s+(.+)$/i.exec(request.headers.authorization ?? "")
-  if (match) return decodeCredential(match[1])
-  return Effect.succeed(emptyCredential())
+// 从 cookie 提取 session token（web 用）
+function tokenFromCookie(request: HttpServerRequest.HttpServerRequest): string | null {
+  const cookieHeader = request.headers.cookie
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(";")) {
+    const [key, ...valueParts] = part.trim().split("=")
+    if (key === SESSION_COOKIE) return valueParts.join("=")
+  }
+  return null
 }
 
 export const authorizationLayer = Layer.effect(
   Authorization,
-  Effect.gen(function* () {
-    const config = yield* ServerAuth.Config
-    if (!ServerAuth.required(config)) return Authorization.of((effect) => effect)
-    return Authorization.of((effect) =>
+  Effect.succeed(
+    Authorization.of((effect) =>
       Effect.gen(function* () {
+        const userSvc = yield* UserService
+        const tokenSvc = yield* AuthTokenService
+
         const request = yield* HttpServerRequest.HttpServerRequest
-        const credential = yield* credentialFromRequest(request)
-        if (ServerAuth.authorized(credential, config)) return yield* effect
-        yield* HttpEffect.appendPreResponseHandler((_request, response) =>
-          Effect.succeed(HttpServerResponse.setHeader(response, "www-authenticate", WWW_AUTHENTICATE)),
+        const url = new URL(request.url, "http://localhost")
+
+        // 公开路径直接放行
+        if (PUBLIC_PATHS.has(url.pathname)) return yield* effect
+
+        // 1. 尝试 cookie 认证（web 端）
+        const cookieToken = tokenFromCookie(request)
+        if (cookieToken) {
+          const tokenInfo = yield* tokenSvc.verify(cookieToken)
+          if (tokenInfo) {
+            // 惰性续期
+            yield* tokenSvc.extend(cookieToken).pipe(Effect.catch(() => Effect.void))
+            // 加载用户
+            const user = yield* userSvc.getUser(tokenInfo.userId).pipe(Effect.catch(() => Effect.succeed(null)))
+            if (user && user.disabled === 0) {
+              return yield* effect.pipe(Effect.provideService(CurrentUser, user))
+            }
+          }
+          // cookie 存在但无效 → 拒绝（不回退到其他认证方式）
+          yield* HttpEffect.appendPreResponseHandler((_req, response) =>
+            Effect.succeed(HttpServerResponseModule.HttpServerResponse.setHeader(response, "www-authenticate", 'Bearer realm="opencode"')),
+          )
+          return yield* new UnauthorizedError({ message: "登录已过期" })
+        }
+
+        // 2. 无 cookie → 拒绝（不再支持 Basic Auth）
+        yield* HttpEffect.appendPreResponseHandler((_req, response) =>
+          Effect.succeed(HttpServerResponseModule.HttpServerResponse.setHeader(response, "www-authenticate", 'Bearer realm="opencode"')),
         )
         return yield* new UnauthorizedError({ message: "Authentication required" })
-      }),
-    )
-  }),
+      }) as Effect.Effect<HttpServerResponse, never, never>,
+    ),
+  ),
 )

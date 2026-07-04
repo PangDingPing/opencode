@@ -13,6 +13,7 @@ import { WorkspaceV2 } from "../workspace"
 import { Timestamps } from "../database/schema.sql"
 import type { SystemContext } from "../system-context/index"
 import { AgentV2 } from "../agent"
+import type { UserID } from "../user/sql"
 
 type SessionMessageData = Omit<(typeof SessionMessage.Message)["Encoded"], "type" | "id">
 type V1MessageData = Omit<SessionV1.Info, "id" | "sessionID">
@@ -27,6 +28,7 @@ export const SessionTable = sqliteTable(
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
     workspace_id: text().$type<WorkspaceV2.ID>(),
+    user_id: text().$type<UserID>(),
     parent_id: text().$type<SessionSchema.ID>(),
     slug: text().notNull(),
     directory: DatabasePath.directoryColumn().notNull(),

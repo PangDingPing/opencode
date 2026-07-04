@@ -3,7 +3,12 @@ import { httpClient } from "@opencode-ai/core/effect/layer-node-platform"
 import { Context, Effect, FiberMap, Iterable, Layer, Schema, Stream } from "effect"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientError, HttpClientRequest } from "effect/unstable/http"
-import { Database } from "@opencode-ai/core/database/database"
+import type { Interface as DatabaseInterface } from "@opencode-ai/core/database/database"
+import {
+  defaultLayer as DatabaseDefaultLayer,
+  node as DatabaseNode,
+  Service as DatabaseService,
+} from "@opencode-ai/core/database/database"
 import { asc } from "drizzle-orm"
 import { eq } from "drizzle-orm"
 import { inArray } from "drizzle-orm"
@@ -177,7 +182,7 @@ export const layer = Layer.effect(
     const vcs = yield* Vcs.Service
     const flags = yield* RuntimeFlags.Service
     const fs = yield* FSUtil.Service
-    const { db } = yield* Database.Service
+    const { db } = yield* DatabaseService
     const connections = new Map<WorkspaceV2.ID, ConnectionStatus>()
     const syncFibers = yield* FiberMap.make<WorkspaceV2.ID, void, SyncLoopError>()
 
@@ -908,7 +913,7 @@ export const defaultLayer = layer.pipe(
   Layer.provide(Project.defaultLayer),
   Layer.provide(Vcs.defaultLayer),
   Layer.provide(FSUtil.defaultLayer),
-  Layer.provide(Database.defaultLayer),
+  Layer.provide(DatabaseDefaultLayer),
   Layer.provide(EventV2Bridge.defaultLayer),
   Layer.provide(FetchHttpClient.layer),
   Layer.provide(RuntimeFlags.defaultLayer),
@@ -925,7 +930,7 @@ type HistoryEvent = {
 }
 
 function waitUntilSynced(input: {
-  db: Database.Interface["db"]
+  db: DatabaseInterface["db"]
   workspaceID: WorkspaceV2.ID
   state: Record<string, number>
   signal?: AbortSignal
@@ -945,7 +950,7 @@ function waitUntilSynced(input: {
   )
 }
 
-function synced(db: Database.Interface["db"], state: Record<string, number>): Effect.Effect<boolean> {
+function synced(db: DatabaseInterface["db"], state: Record<string, number>): Effect.Effect<boolean> {
   const ids = Object.keys(state)
   if (ids.length === 0) return Effect.succeed(true)
 
@@ -983,7 +988,7 @@ export const node = LayerNode.make(layer, [
   Vcs.node,
   RuntimeFlags.node,
   FSUtil.node,
-  Database.node,
+  DatabaseNode,
 ])
 
 export * as Workspace from "./workspace"

@@ -27,6 +27,7 @@ import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
 import { WindowsAppMenu } from "./windows-app-menu"
+import { UserMenu } from "./user-menu"
 import { applyPath, backPath, forwardPath } from "./titlebar-history"
 import { useServerSync } from "@/context/server-sync"
 import { base64Encode } from "@opencode-ai/core/util/encode"
@@ -707,6 +708,7 @@ export function Titlebar(props: { update?: TitlebarUpdate }) {
               onMouseDown={drag}
             >
               <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" />
+              <UserMenu />
               <Show when={windows()}>
                 {!tauriApi() && <div class="shrink-0" style={{ width: windowsControlsWidth() }} />}
                 <div data-tauri-decorum-tb class="flex flex-row" />
@@ -739,6 +741,7 @@ function TitlebarV2Right(props: { state: TitlebarV2RightState }) {
         <TitlebarUpdateIconButton state={props.state.update} />
       </Show>
       <div id="opencode-titlebar-right" class="flex shrink-0 items-center justify-end gap-0" />
+      <UserMenu />
     </div>
   )
 }

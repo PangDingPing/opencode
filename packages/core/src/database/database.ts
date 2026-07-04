@@ -1,5 +1,3 @@
-export * as Database from "./database"
-
 import { EffectDrizzleSqlite } from "@opencode-ai/effect-drizzle-sqlite"
 import { layer as sqliteLayer } from "#sqlite"
 import { Context, Effect, Layer } from "effect"
@@ -61,3 +59,8 @@ export const defaultLayer = Layer.unwrap(
 ).pipe(Layer.provide(Global.defaultLayer))
 
 export const node = LayerNode.make(layerFromPath(path()), [])
+
+// 别名：让 `import { Database } from "..."` 后能用 Database.Service / .defaultLayer / .node
+// 旧写法 `export { Service as Database }` 只把 Service 类重命名为 Database，但 defaultLayer/node 是顶层 const，无法作为 Service 类的属性
+// 所以用一个对象把三者打包后作为 Database 导出
+export const Database = { Service, defaultLayer, node }
