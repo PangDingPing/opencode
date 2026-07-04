@@ -59,6 +59,9 @@ import { SessionPage, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome, LegacyHome } from "@/pages/home"
 
 const NewSession = lazy(() => import("@/pages/new-session"))
+// 账号设置页和用户管理页 —— 独立路由，避免被 /:dir 通配捕获当 base64 目录解码
+const UserSettingsPage = lazy(() => import("@/pages/settings"))
+const AdminUsersPage = lazy(() => import("@/pages/admin/users"))
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -537,6 +540,8 @@ function Routes() {
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
+      <Route path="/settings" component={UserSettingsPage} />
+      <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
     </>
   )
