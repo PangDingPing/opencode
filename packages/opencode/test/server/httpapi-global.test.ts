@@ -15,12 +15,14 @@ import { controlPlaneHandlers } from "../../src/server/routes/instance/httpapi/h
 import { globalHandlers } from "../../src/server/routes/instance/httpapi/handlers/global"
 import { authorizationLayer } from "../../src/server/routes/instance/httpapi/middleware/authorization"
 import { schemaErrorLayer } from "../../src/server/routes/instance/httpapi/middleware/schema-error"
+import { mockAuthServicesLayer } from "../lib/mock-auth-services"
 import { testEffect } from "../lib/effect"
 
 const apiLayer = HttpRouter.serve(
   HttpApiBuilder.layer(RootHttpApi).pipe(
     Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
     Layer.provide([authorizationLayer, schemaErrorLayer]),
+    Layer.provide(mockAuthServicesLayer),
     // Raw HttpApi routes expose an opaque handler context at the request boundary.
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
     HttpRouter.provideRequest(Layer.succeedContext(Context.empty() as Context.Context<unknown>)),
