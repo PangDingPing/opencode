@@ -5,7 +5,7 @@ import { HttpApiError, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { hasPtyConnectTicketURL } from "@/server/shared/pty-ticket"
 import { isPublicUIPath } from "@/server/shared/public-ui"
 import { CurrentUser, SESSION_COOKIE } from "@opencode-ai/server/middleware/auth"
-import { User } from "@opencode-ai/core/user"
+import { User, UserID } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
 export {
   Authorization as ServerAuthorization,
@@ -149,7 +149,7 @@ export const authorizationLayer = Layer.effect(
             Effect.catch(() => Effect.succeed(null)),
           )
           if (tokenInfo) {
-            const user = yield* userSvc.getUser(tokenInfo.userId).pipe(
+            const user = yield* userSvc.getUser(UserID.make(tokenInfo.userId)).pipe(
               Effect.catch(() => Effect.succeed(null)),
             )
             if (user && user.disabled === 0) {
@@ -165,7 +165,7 @@ export const authorizationLayer = Layer.effect(
           const credential = yield* credentialFromRequest(request)
           if (ServerAuth.authorized(credential, config)) {
             const cliUser = {
-              id: "usr_cli",
+              id: UserID.make("usr_cli"),
               username: config.username,
               role: "admin" as const,
               display_name: "CLI",
