@@ -16,6 +16,11 @@ import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { NamedError } from "@opencode-ai/core/util/error"
+import { CurrentUser } from "@opencode-ai/server/middleware/auth"
+import { Database } from "@opencode-ai/core/database/database"
+import { SessionTable } from "@opencode-ai/core/session/sql"
+import { UserID } from "@opencode-ai/core/user/sql"
+import { eq } from "drizzle-orm"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect/instance-state"
@@ -62,7 +67,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const scope = yield* Scope.Scope
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
+      const user = yield* CurrentUser
       const directory = ctx.query.directory ? yield* InstanceState.directory : undefined
+      // 普通用户只能看自己的 session，admin 看全部
+      const userID = user.role === "admin" ? undefined : user.id
       return yield* session.list({
         directory: ctx.query.scope === "project" ? undefined : directory,
         scope: ctx.query.scope,
@@ -71,6 +79,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         start: ctx.query.start,
         search: ctx.query.search,
         limit: ctx.query.limit,
+        ...(userID ? { userID } : {}),
       })
     })
 
@@ -152,8 +161,18 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       )
     })
 
+    // create 后补写 user_id（V1 SessionInfo 无 user_id 字段，projector 硬编码 null）
+    const writeOwnership = (sessionID: SessionID, userID: UserID) =>
+      Effect.gen(function* () {
+        const { db } = yield* Database.Service
+        yield* db.update(SessionTable).set({ user_id: userID }).where(eq(SessionTable.id, sessionID)).run().pipe(Effect.orDie)
+      })
+
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
-      return yield* shareSvc.create(ctx.payload)
+      const user = yield* CurrentUser
+      const result = yield* shareSvc.create(ctx.payload)
+      yield* writeOwnership(result.id, user.id)
+      return result
     })
 
     const createRaw = Effect.fn("SessionHttpApi.createRaw")(function* (ctx: {
