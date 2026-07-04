@@ -1,11 +1,11 @@
 import { Effect, Schema } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { HttpServerResponse, HttpServerRequest, HttpEffect } from "effect/unstable/http"
 import { Api } from "../api"
 import { User } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
 import { CurrentUser, SESSION_COOKIE } from "../middleware/auth"
-import { UnauthorizedError, InvalidRequestError } from "../errors"
+import { UnauthorizedError, InvalidRequestError } from "@opencode-ai/protocol/errors"
 
 // 登录限速：同 IP 5 次失败锁 15 分钟
 const loginAttempts = new Map<string, { count: number; lockedUntil: number }>()
@@ -132,7 +132,9 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
             return yield* new InvalidRequestError({ message: "旧密码错误" })
           }
 
-          yield* userSvc.changePassword(user.id, newPassword)
+          yield* userSvc.changePassword(user.id, newPassword).pipe(
+            Effect.mapError((e) => new InvalidRequestError({ message: (e as Error).message })),
+          )
 
           // 撤销其他 session（保留当前）
           const request = yield* HttpServerRequest.HttpServerRequest
@@ -158,7 +160,7 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
         Effect.gen(function* () {
           const user = yield* CurrentUser
           yield* userSvc.deleteUser(user.id)
-          return HttpApiSchema.NoContent
+          return { ok: true as const }
         }),
       )
   }),
