@@ -6,6 +6,8 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { Credential } from "@opencode-ai/core/credential"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { LocationServiceMap } from "@opencode-ai/core/location-service-map"
@@ -19,6 +21,8 @@ import { ServerAuth } from "./auth"
 import { handlers } from "./handlers"
 import { authorizationLayer } from "./middleware/authorization"
 import { schemaErrorLayer } from "./middleware/schema-error"
+import { cookieAuthLayer } from "./middleware/auth"
+import { requireAdminLayer } from "./middleware/require-admin"
 import { PtyEnvironment } from "./pty-environment"
 import { layer as locationLayer } from "./location"
 import { sessionLocationLayer } from "./middleware/session-location"
@@ -32,6 +36,8 @@ const applicationServices = LayerNode.group([
   PermissionSaved.node,
   PtyTicket.node,
   Credential.node,
+  User.node,
+  AuthToken.node,
   PtyEnvironment.node,
   LocationServiceMap.node,
 ])
@@ -57,6 +63,8 @@ function makeRoutes<AuthError, AuthServices>(auth: Layer.Layer<ServerAuth.Config
     Layer.provide(locationLayer),
     Layer.provide(authorizationLayer),
     Layer.provide(schemaErrorLayer),
+    Layer.provide(cookieAuthLayer),
+    Layer.provide(requireAdminLayer),
     Layer.provide(auth),
     Layer.provide(serviceLayer),
   )
