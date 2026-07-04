@@ -83,6 +83,7 @@ type CreateInput = {
   agent?: AgentV2.ID
   model?: ModelV2.Ref
   location: Location.Ref
+  userID?: UserID
 }
 
 type CompactInput = {
@@ -259,6 +260,15 @@ const layer = Layer.effect(
             }),
           )
         if (projected.type === "existing") return projected.session
+        // projector.sessionRow 硬编码 user_id: null（V1 SessionInfo 无该字段），这里补写归属人
+        if (input.userID) {
+          yield* db
+            .update(SessionTable)
+            .set({ user_id: input.userID })
+            .where(eq(SessionTable.id, sessionID))
+            .run()
+            .pipe(Effect.orDie)
+        }
         // TODO: Restore recorded sessions onto replacement synchronized workspaces in a future API slice.
         return yield* result.get(sessionID).pipe(Effect.orDie)
       }),
