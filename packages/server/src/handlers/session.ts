@@ -86,6 +86,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               agent: ctx.payload.agent,
               model: ctx.payload.model,
               location: ctx.payload.location ?? { directory },
+              userID: user.id,
             }),
           }
         }),
