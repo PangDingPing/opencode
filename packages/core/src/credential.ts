@@ -7,6 +7,7 @@ import { Integration } from "@opencode-ai/schema/integration"
 import { Database } from "./database/database"
 import { makeGlobalNode } from "./effect/app-node"
 import { CredentialTable } from "./credential/sql"
+import { UserID } from "./user/sql"
 
 export const ID = Credential.ID
 export type ID = Credential.ID
@@ -25,6 +26,7 @@ export class Info extends Schema.Class<Info>("Credential.Info")({
   integrationID: Integration.ID,
   label: Schema.String,
   value: Value,
+  userID: Schema.optional(UserID),
 }) {}
 
 export interface Interface {
@@ -39,6 +41,7 @@ export interface Interface {
     readonly integrationID: Integration.ID
     readonly value: Value
     readonly label?: string
+    readonly userID?: UserID
   }) => Effect.Effect<Info>
   /** Updates the label or secret value of a stored credential. */
   readonly update: (id: ID, updates: Partial<Pick<Info, "label" | "value">>) => Effect.Effect<void>
@@ -60,6 +63,7 @@ const layer = Layer.effect(
         integrationID: row.integration_id,
         label: row.label,
         value: decode(row.value),
+        ...(row.user_id ? { userID: row.user_id } : {}),
       })
     }
 
@@ -97,6 +101,7 @@ const layer = Layer.effect(
           integrationID: input.integrationID,
           label: input.label ?? "default",
           value: input.value,
+          ...(input.userID ? { userID: input.userID } : {}),
         })
         yield* db
           .transaction((tx) =>
@@ -112,6 +117,7 @@ const layer = Layer.effect(
                   integration_id: credential.integrationID,
                   label: credential.label,
                   value: credential.value,
+                  ...(input.userID ? { user_id: input.userID } : {}),
                 })
                 .run()
             }),
