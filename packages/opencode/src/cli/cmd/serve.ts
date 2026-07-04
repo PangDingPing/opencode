@@ -1,23 +1,30 @@
 import { Effect, Layer } from "effect"
-import { effectCmd } from "../effect-cmd"
+import { effectCmd, CliError } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Database } from "@opencode-ai/core/database/database"
 import { User } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
-import { count } from "drizzle-orm"
+import { count, eq } from "drizzle-orm"
 import { UserTable } from "@opencode-ai/core/user/sql"
 
 /**
- * 启动引导：首次启动时创建 admin 账号
- * - 如果 user 表已有用户（含迁移脚本创建的 29 人），跳过
- * - 没有用户且没设 OPENCODE_SERVER_PASSWORD → fail-fast
- * - 没有用户且设了密码 → 创建 admin 账号
+ * 启动引导：确保系统中至少有一个 admin 账号
+ * - 如果已有 admin 角色用户（含迁移脚本创建的），跳过
+ * - 没有 admin 且没设 OPENCODE_SERVER_PASSWORD → fail-fast
+ * - 没有 admin 且设了密码 → 创建 admin 账号
+ * - 注意：迁移脚本会用白名单创建 29 个普通用户，但不会创建 admin，
+ *   所以此处用 role='admin' 作为判断条件，而不是 user 表是否为空
  */
 function bootstrapAdmin() {
-  return Effect.gen("Cli.serve.bootstrapAdmin", function* () {
+  return Effect.gen(function* () {
     const { db } = yield* Database.Service
-    const result = yield* db.select({ c: count() }).from(UserTable).get().pipe(Effect.orDie)
+    const result = yield* db
+      .select({ c: count() })
+      .from(UserTable)
+      .where(eq(UserTable.role, "admin"))
+      .get()
+      .pipe(Effect.orDie)
     if (result && result.c > 0) return
 
     const password = Flag.OPENCODE_SERVER_PASSWORD
@@ -48,10 +55,11 @@ export const ServeCommand = effectCmd({
     }
 
     // 启动引导：确保 admin 账号存在
+    // User/AuthToken 依赖 Database，合并到一个 layer 一次性 provide
+    const bootstrapLayer = Layer.mergeAll(Database.defaultLayer, User.defaultLayer, AuthToken.defaultLayer)
     yield* bootstrapAdmin().pipe(
-      Effect.provide(Database.defaultLayer),
-      Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
-      Effect.provide(Layer.merge(AuthToken.defaultLayer, Database.defaultLayer)),
+      Effect.provide(bootstrapLayer),
+      Effect.mapError((e) => new CliError({ message: (e as Error).message })),
     )
 
     const opts = yield* resolveNetworkOptions(args)
