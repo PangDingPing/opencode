@@ -1,10 +1,10 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { Schema } from "effect"
 import { Timestamps } from "../database/schema.sql"
 
-// 用户 ID 品牌类型（schema + type 同名，方便其他模块同时 import）
-export const UserID = Schema.String.pipe(Schema.brand("UserID"))
-export type UserID = typeof UserID.Type
+// 用户 ID 品牌类型：定义在 schema 包，这里 re-export 保持单一来源
+// UserID 既是值（Schema）也是类型（brand），单 export 即可同时导出两者
+import { UserID } from "@opencode-ai/schema/user-id"
+export { UserID }
 
 // 用户角色
 export type Role = "admin" | "user"
@@ -18,7 +18,7 @@ export type Role = "admin" | "user"
 export const UserTable = sqliteTable(
   "user",
   {
-    id: text().$type<ID>().primaryKey(),
+    id: text().$type<UserID>().primaryKey(),
     username: text().notNull().unique(),
     password_hash: text().notNull(),
     role: text().$type<Role>().notNull(),
