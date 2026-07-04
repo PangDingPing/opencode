@@ -55,3 +55,6 @@ export function path() {
 }
 
 export const node = makeGlobalNode({ service: Service, layer: layerFromPath(path()), deps: [] })
+
+// 让 `import { Database }` 后能用 Database.defaultLayer / .node
+export const defaultLayer = layerFromPath(path())
