@@ -57,6 +57,7 @@ import { legacySessionServer, requireServerKey, sessionHref } from "./utils/sess
 
 import { SessionPage, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome, LegacyHome } from "@/pages/home"
+import { SkillsPanel } from "@/components/skills-panel"
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 // 账号设置页和用户管理页 —— 独立路由，避免被 /:dir 通配捕获当 base64 目录解码
@@ -170,6 +171,7 @@ function ResolvedDraftRoute(props: { draft: DraftTab }) {
                 <DraftProviders>
                   <NewSession />
                 </DraftProviders>
+                <SkillsPanel />
               </DirectoryDataProvider>
             </SDKProvider>
           </DraftServerScopedProviders>
