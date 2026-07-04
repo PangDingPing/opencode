@@ -34,6 +34,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { Snapshot } from "@/snapshot"
 import { ProjectV2 } from "@opencode-ai/core/project"
 import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { UserID } from "@opencode-ai/core/user/sql"
 import { SessionID, MessageID, PartID } from "./schema"
 
 import type { Provider } from "@/provider/provider"
@@ -308,6 +309,7 @@ export type ListInput = {
   start?: number
   search?: string
   limit?: number
+  userID?: UserID
 }
 
 export type GlobalListInput = {
@@ -992,6 +994,9 @@ function listByProject(
   }
   if (input.search) {
     conditions.push(like(SessionTable.title, `%${input.search}%`))
+  }
+  if (input.userID) {
+    conditions.push(eq(SessionTable.user_id, input.userID))
   }
 
   const limit = input.limit ?? 100
