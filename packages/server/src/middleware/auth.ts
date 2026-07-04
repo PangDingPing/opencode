@@ -3,10 +3,10 @@ import { HttpServerRequest, HttpEffect } from "effect/unstable/http"
 import type { HttpServerResponse } from "effect/unstable/http"
 import * as HttpServerResponseModule from "effect/unstable/http"
 import { HttpApiMiddleware } from "effect/unstable/httpapi"
-import { Service as UserService } from "@opencode-ai/core/user"
+import { Service as UserService, UserID } from "@opencode-ai/core/user"
 import type { UserInfo } from "@opencode-ai/core/user"
 import { Service as AuthTokenService } from "@opencode-ai/core/auth-token"
-import { UnauthorizedError } from "../errors"
+import { UnauthorizedError } from "@opencode-ai/protocol/errors"
 
 // cookie 名称
 export const SESSION_COOKIE = "oc_session"
@@ -66,7 +66,7 @@ export const cookieAuthLayer = Layer.effect(
         yield* tokenSvc.extend(token).pipe(Effect.catch(() => Effect.void))
 
         // 加载用户信息
-        const user = yield* userSvc.getUser(tokenInfo.userId).pipe(
+        const user = yield* userSvc.getUser(UserID.make(tokenInfo.userId)).pipe(
           Effect.catch(() =>
             Effect.gen(function* () {
               yield* HttpEffect.appendPreResponseHandler((_req, response) =>
@@ -85,7 +85,7 @@ export const cookieAuthLayer = Layer.effect(
 
         // 注入 CurrentUser 到上下文
         return yield* effect.pipe(Effect.provideService(CurrentUser, user))
-      }) as Effect.Effect<HttpServerResponse, never, never>,
+      }) as Effect.Effect<HttpServerResponse.HttpServerResponse, never, never>,
     ),
   ),
 )
