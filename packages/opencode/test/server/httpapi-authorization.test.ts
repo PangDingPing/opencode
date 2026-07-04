@@ -10,6 +10,7 @@ import {
   ServerAuthorization,
   serverAuthorizationLayer,
 } from "../../src/server/routes/instance/httpapi/middleware/authorization"
+import { mockAuthServicesLayer } from "../lib/mock-auth-services"
 import { testEffect } from "../lib/effect"
 
 const Api = HttpApi.make("test-authorization").add(
@@ -47,7 +48,11 @@ const serverHandlers = HttpApiBuilder.group(ServerApi, "test.v2", (handlers) =>
 )
 
 const apiLayer = HttpRouter.serve(
-  HttpApiBuilder.layer(Api).pipe(Layer.provide(handlers), Layer.provide(authorizationLayer)),
+  HttpApiBuilder.layer(Api).pipe(
+    Layer.provide(handlers),
+    Layer.provide(authorizationLayer),
+    Layer.provide(mockAuthServicesLayer),
+  ),
   { disableListenLog: true, disableLogger: true },
 ).pipe(Layer.provideMerge(NodeHttpServer.layerTest))
 
