@@ -1,10 +1,10 @@
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
-import { User, type UserInfo } from "@opencode-ai/core/user"
+import { User, type UserInfo, UserID } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
 import { CurrentUser } from "../middleware/auth"
-import { ForbiddenError, InvalidRequestError, ConflictError } from "../errors"
+import { ForbiddenError, InvalidRequestError, ConflictError } from "@opencode-ai/protocol/errors"
 
 // UserInfo（disabled/must_change_password 是 number）→ 响应（boolean）
 function toResponse(user: UserInfo) {
@@ -26,14 +26,14 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
     const tokenSvc = yield* AuthToken.Service
 
     // 自保护：不能对自己执行某操作
-    const assertNotSelf = (targetId: string, action: string) =>
+    const assertNotSelf = (targetId: UserID, action: string) =>
       Effect.gen(function* () {
         const me = yield* CurrentUser
         if (me.id === targetId) return yield* new ForbiddenError({ message: `不能对自己执行${action}` })
       })
 
     // 最后一个 admin 防护：若目标是 admin，确保还有其他启用的 admin
-    const assertNotLastAdmin = (targetId: string) =>
+    const assertNotLastAdmin = (targetId: UserID) =>
       Effect.gen(function* () {
         const users = yield* userSvc.listUsers()
         const others = users.filter((u) => u.role === "admin" && u.disabled === 0 && u.id !== targetId)
@@ -41,7 +41,7 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
       })
 
     // 加载目标用户，不存在返回 400
-    const loadUser = (id: string) =>
+    const loadUser = (id: UserID) =>
       userSvc.getUser(id).pipe(
         Effect.mapError((e) => new InvalidRequestError({ message: (e as Error).message })),
       )
@@ -68,7 +68,7 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
       )
       .handle("admin.user.update", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           const { role, display_name } = req.payload
           const target = yield* loadUser(id)
           // 角色变更：自保护 + 最后一个 admin 防护
@@ -78,14 +78,16 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
               yield* assertNotLastAdmin(id)
             }
           }
-          yield* userSvc.updateUser({ id, role, display_name })
-          const updated = yield* userSvc.getUser(id)
+          yield* userSvc.updateUser({ id, role, display_name }).pipe(
+            Effect.mapError((e) => new InvalidRequestError({ message: (e as Error).message })),
+          )
+          const updated = yield* loadUser(id)
           return toResponse(updated)
         }),
       )
       .handle("admin.user.reset-password", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           const { newPassword } = req.payload
           yield* assertNotSelf(id, "重置密码（请用修改密码）")
           const target = yield* loadUser(id)
@@ -98,7 +100,7 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
       )
       .handle("admin.user.disable", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           yield* assertNotSelf(id, "禁用")
           const target = yield* loadUser(id)
           if (target.role === "admin") yield* assertNotLastAdmin(id)
@@ -110,14 +112,14 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
       )
       .handle("admin.user.enable", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           yield* userSvc.setDisabled(id, false)
           return { ok: true as const }
         }),
       )
       .handle("admin.user.sessions.revoke", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           yield* assertNotSelf(id, "踢下线")
           yield* tokenSvc.revokeAllForUser(id)
           return { ok: true as const }
@@ -125,7 +127,7 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
       )
       .handle("admin.user.delete", (req) =>
         Effect.gen(function* () {
-          const { id } = req.params
+          const id = UserID.make(req.params.id)
           yield* assertNotSelf(id, "删除")
           const target = yield* loadUser(id)
           if (target.role === "admin") yield* assertNotLastAdmin(id)
