@@ -1,10 +1,7 @@
 import { Show, createEffect, createMemo, createResource, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSearchParams } from "@solidjs/router"
-import { createMediaQuery } from "@solid-primitives/media"
-import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { NewSessionDesignView } from "@/components/session"
-import FileTree from "@/components/file-tree"
 import { PromptInput } from "@/components/prompt-input"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import {
@@ -13,16 +10,14 @@ import {
   createPromptProjectController,
 } from "@/components/prompt-project-selector"
 import { useComments } from "@/context/comments"
-import { useFile } from "@/context/file"
-import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
-import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useLanguage } from "@/context/language"
 import { createPromptInputController, createPromptProjectControls } from "@/pages/session/composer"
-import { shouldShowFileTree } from "@/pages/session/helpers"
+import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { createSizing } from "@/pages/session/helpers"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
@@ -32,7 +27,7 @@ const showWorkspaceBar = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
 /**
  * The `/new-session` draft page. Renders the prompt composer for a brand-new session
- * with an optional file tree sidebar — no terminal, review pane, or message timeline.
+ * with the session-side-panel on the right (file tree only, no review pane).
  * Submitting promotes the draft into a real session (see prompt-input/submit).
  */
 export default function NewSessionPage() {
@@ -42,9 +37,6 @@ export default function NewSessionPage() {
   const serverSync = useServerSync()
   const comments = useComments()
   const language = useLanguage()
-  const layout = useLayout()
-  const settings = useSettings()
-  const file = useFile()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
 
@@ -100,51 +92,11 @@ export default function NewSessionPage() {
     (promise) => promise.then(() => true),
   )
 
-  // 文件树侧边栏：桌面端 + 设置可见 + layout 打开 时显示
-  const isDesktop = createMediaQuery("(min-width: 768px)")
-  const fileTreeOpen = createMemo(
-    () =>
-      isDesktop() &&
-      shouldShowFileTree({
-        visible: settings.visibility.fileTree(),
-        opened: layout.fileTree.opened(),
-      }),
-  )
-
-  // 加载文件树根目录，directory 变化时刷新
-  let treeDir: string | undefined
-  createEffect(() => {
-    const dir = sdk().directory
-    if (!isDesktop()) return
-    if (!layout.fileTree.opened()) return
-    if (sync().status === "loading") return
-
-    layout.fileTree.tab()
-    const refresh = treeDir !== dir
-    treeDir = dir
-    void (refresh ? file.tree.refresh("") : file.tree.list(""))
-  })
+  // new-session 没有 review，传空值给 SessionSidePanel，只显示文件树
+  const size = createSizing()
 
   return (
     <div class="relative size-full overflow-hidden flex flex-row">
-      <Show when={fileTreeOpen()}>
-        <aside
-          class="relative h-full shrink-0 overflow-hidden bg-background-base border-r border-border-weaker-base"
-          style={{ width: `${layout.fileTree.width()}px` }}
-        >
-          <div class="h-full flex flex-col overflow-hidden">
-            <FileTree path="" class="pt-3 px-3 flex-1 min-h-0 overflow-auto" onFileClick={(node) => file.load(node.path)} />
-          </div>
-          <ResizeHandle
-            direction="horizontal"
-            edge="end"
-            size={layout.fileTree.width()}
-            min={200}
-            max={480}
-            onResize={(width) => layout.fileTree.resize(width)}
-          />
-        </aside>
-      </Show>
       <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
         <div class="@container relative flex flex-col min-h-0 h-full flex-1">
           <div class="flex-1 min-h-0 overflow-hidden rounded-[10px]">
@@ -212,6 +164,18 @@ export default function NewSessionPage() {
           </div>
         </div>
       </div>
+      <SessionSidePanel
+        canReview={() => false}
+        diffs={() => []}
+        diffsReady={() => true}
+        empty={() => ""}
+        hasReview={() => false}
+        reviewCount={() => 0}
+        reviewPanel={() => <></>}
+        focusReviewDiff={() => {}}
+        reviewSnap={false}
+        size={size}
+      />
     </div>
   )
 }
