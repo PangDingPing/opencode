@@ -71,6 +71,7 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { SkillsPanel } from "@/components/skills-panel"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
 import { ReviewPanelV2 } from "@/pages/session/v2/review-panel-v2"
@@ -270,6 +271,7 @@ function TargetSessionPage() {
   return (
     <Show when={`${serverSDK().scope}\0${sdk().directory}`} keyed>
       <SessionPage />
+      <SkillsPanel />
     </Show>
   )
 }
