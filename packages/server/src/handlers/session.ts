@@ -86,7 +86,6 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               agent: ctx.payload.agent,
               model: ctx.payload.model,
               location: ctx.payload.location ?? { directory },
-              userID: user.id,
             }),
           }
         }),
@@ -105,7 +104,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         "session.get",
         Effect.fn(function* (ctx) {
           const user = yield* CurrentUser
-          const session = yield* session.get(ctx.params.sessionID).pipe(
+          const info = yield* session.get(ctx.params.sessionID).pipe(
             Effect.catchTag(
               "Session.NotFoundError",
               (error) =>
@@ -115,13 +114,13 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 }),
             ),
           )
-          if (user.role !== "admin" && session.userID !== user.id) {
+          if (user.role !== "admin" && info.userID !== user.id) {
             return yield* new SessionNotFoundError({
               sessionID: ctx.params.sessionID,
               message: "Session not found",
             })
           }
-          return { data: session }
+          return { data: info }
         }),
       )
       .handle(
