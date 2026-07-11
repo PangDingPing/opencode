@@ -135,6 +135,12 @@ try {
         New-Item -ItemType Directory -Path "$dataDir\tmp" -Force | Out-Null
     }
 
+    # yejian: 默认项目目录（/YEJIAN 路径），单独挂载为容器的 /YEJIAN
+    $yejianDir = "$workbenchDir\YEJIAN"
+    if (-not (Test-Path $yejianDir)) {
+        New-Item -ItemType Directory -Path $yejianDir -Force | Out-Null
+    }
+
     # Start container
     # Note: do NOT use a variable that bundles "--env-file <path>" into one string
     #       and pass it to docker - PowerShell won't split on spaces, so docker
@@ -151,6 +157,7 @@ try {
         docker run -d --name $ContainerName `
             -p "${HostPort}:${ContainerPort}" `
             -v "${workbenchDir}:/workspace" `
+            -v "${yejianDir}:/YEJIAN" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -w /workspace `
@@ -161,6 +168,7 @@ try {
         docker run -d --name $ContainerName `
             -p "${HostPort}:${ContainerPort}" `
             -v "${workbenchDir}:/workspace" `
+            -v "${yejianDir}:/YEJIAN" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -w /workspace `
