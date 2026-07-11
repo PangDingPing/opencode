@@ -1,5 +1,6 @@
 import { createSignal, Show, type Component } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
+import { navigateToDefaultProject } from "@/utils/default-project"
 
 // 改密页：首次登录（forceMode）只输入新密码，日常改密需输入旧密码
 const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
@@ -59,7 +60,8 @@ const ChangePasswordPage: Component<{ forceMode?: boolean }> = (props) => {
         return
       }
 
-      window.location.href = "/new-session"
+      // yejian: 改密成功，跳转到默认项目
+      navigateToDefaultProject()
     } catch {
       setError("网络错误，请重试")
       setLoading(false)
