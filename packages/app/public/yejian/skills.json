@@ -18,7 +18,7 @@
             "老旧小区改造项目还能从哪些角度切入？",
             "周末带 8 岁孩子去哪玩有意思？"
           ],
-          "prompt": "请使用 brainstorming 技能，对【我的问题/主题】进行头脑风暴。"
+          "prompt": "请使用 brainstorming 技能，对以下问题/主题进行头脑风暴：\n\n"
         },
         {
           "name": "梳理头绪",
@@ -33,7 +33,7 @@
             "帮我梳理下如何准备一场技术标答辩",
             "帮我梳理一下部门年度总结的写作框架"
           ],
-          "prompt": "请使用 thought-clarifier 技能，帮我梳理头绪："
+          "prompt": "请使用 thought-clarifier 技能，根据以下要点帮我梳理头绪：\n\n"
         },
         {
           "name": "决策顾问",
@@ -47,7 +47,7 @@
             "孩子要小升初了，是去冲名校还是留在对口普通学校？",
             "最近体检出了轻度脂肪肝，要不要立刻办健身卡 + 控制饮食？"
           ],
-          "prompt": "请使用 decision-advisor 技能，帮我分析以下决策："
+          "prompt": "请使用 decision-advisor 技能，帮我分析以下决策：\n\n"
         },
         {
           "name": "智囊评审",
@@ -62,7 +62,7 @@
             "帮我审一下我准备的工作汇报 PPT",
             "帮我审一下我给团队制定的考核制度"
           ],
-          "prompt": "请使用 brain-trust-review 技能，帮我评审【方案/计划/行动】。"
+          "prompt": "请使用 brain-trust-review 技能，智囊评审：\n\n【方案/计划/行动】"
         }
       ]
     },
@@ -71,12 +71,18 @@
       "name": "日常办公",
       "skills": [
         {
-          "name": "生成PPT",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "生成PPT",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 生成PPT 技能，"
+          "name": "PPT 专业制作",
+          "developing": false,
+          "skillId": "ppt-master",
+          "tooltip": "AI 驱动的多格式 SVG 内容生成系统。将源文档（PDF / DOCX / URL / Markdown）转换为高质量 SVG 页面，支持模板填充、美化、多角色协作，最终导出为 PPTX。适用于需要专业级演示文稿制作的场景。",
+          "keyword": "创建 PPT、制作 PPT、生成 PPT、做 PPT、制作演示文稿、ppt-master",
+          "case": [
+            "把这份 PDF 报告转换成专业的 PPT",
+            "基于这个 Word 文档制作演示文稿",
+            "将这个网页内容做成 PPT",
+            "美化这份现有 PPT 的排版"
+          ],
+          "prompt": "请使用 ppt-master 技能，基于以下材料进行 PPT 制作，并将过程文件及PPTX保存到用户的文件夹下。\n重要提示：\n1. 如果需要生成图片（如封面主视觉、配图、图标等），请调用 \"agnes-ai-generation\" 技能生成图片，然后再继续 PPT 制作流程。\n2. 仅在确实需要 AI 生成图片时才调用 agnes-ai-generation，如果用户提供了图片或不需要图片，则直接使用现有素材。\n\n"
         },
         {
           "name": "Word的创建/读取/修改/编辑",
@@ -89,7 +95,7 @@
             "按【模板】将内容转换为精美的成品 Word 文档",
             "【Word 文件】插入页码"
           ],
-          "prompt": "请使用 docx 技能，请将以下文字内容转成Word，并保存到【XXXX文件夹】。"
+          "prompt": "请使用 docx 技能，请将以下文字内容转成Word，并保存到用户文件夹下。\n\n"
         },
         {
           "name": "XLSX的创建/读取/修改/编辑",
@@ -98,7 +104,7 @@
           "tooltip": "用户需要打开、读取、编辑或修复现有的 .xlsx、.xlsm、.csv或 .tsv文件（例如：添加列、计算公式、格式化、图表制作、清洗混乱数据）",
           "keyword": "用户提到“XLSX”、“excel”、“.xlsx”、“.xlsm”、“.csv”、“.tsv”等词汇",
           "case": "请将以下两份EXCEL表格进行合并数据：",
-          "prompt": "请使用 xlsx 技能，对【XXX.xlsx】进行【XXX操作】，并保存到【XXXX文件夹】。"
+          "prompt": "请使用 xlsx 技能，对【XXX.xlsx】进行【XXX操作】，并保存到用户文件夹下。\n\n"
         },
         {
           "name": "PDF转MD",
@@ -107,7 +113,7 @@
           "tooltip": "使用 MinerU API 将 PDF / Word / PPT / 图片精准解析为 Markdown 格式，图片保存到同目录 images 文件夹。",
           "keyword": "PDF转成MD文件、Word转成MD文件",
           "case": "把 /YEJIAN/1庞定平/report.pdf 转成 Markdown",
-          "prompt": "请使用 online-to-md 技能，把【以下文件（可多个文件）】转成 Markdown文件，并保存到【XXXX文件夹】："
+          "prompt": "请使用 online-to-md 技能，把【以下文件（可多个文件）】转成 Markdown文件，并保存到用户文件夹下：\n\n"
         },
         {
           "name": "生成提示词",
@@ -154,7 +160,7 @@
           "tooltip": "按现行《绿色建筑评价标准》GB/T50378-2019（2024年版）及《广州市绿色建筑设计与审查指南2025版》对项目文件进行绿色建筑审查，输出审查意见。多 Agent 协作架构。实施流程：①从市审查系统下载待审的PDF；②将PDF转成MD格式；③调用绿建审查技能进行审查。",
           "keyword": "绿建审查",
           "case": "对 /YEJIAN/1庞定平/绿建项目1/ 文件夹下的给排水专业进行绿建审查",
-          "prompt": "请使用 Green-Building-Design-Review 技能，对【项目文件夹】进行【规划/建筑/给排水/暖通/电气/景观/全专业】进行绿色建筑审查。"
+          "prompt": "请使用 Green-Building-Design-Review 技能，对【项目文件夹】进行【规划/建筑/给排水/暖通/电气/景观/全专业】进行绿色建筑审查。\n\n"
         },
         {
           "name": "节能审查",
@@ -256,7 +262,7 @@
           "tooltip": "对 Word 文档进行公文格式排版，包括字体、字号、行距、页边距、页眉页脚、标题层级等规范化处理，输出符合党政机关公文格式国家标准（GB/T 9704-2012）的文档。",
           "keyword": "公文排版、Word 排版、公文格式、党政机关公文格式",
           "case": "把 D:/草稿/调研报告.docx 按公文格式排版",
-          "prompt": "请使用 document-format 技能，对以下文档或文字内容进行公文格式排版，并保存到【XXXX文件夹】。"
+          "prompt": "请使用 document-format 技能，对以下文档或文字内容进行公文格式排版，并保存到用户文件夹。\n\n"
         },
         {
           "name": "公众号一键发布",
@@ -421,20 +427,32 @@
       "name": "多模态",
       "skills": [
         {
-          "name": "文生图",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "文生图",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 文生图 技能，"
+          "name": "文本生成图片",
+          "developing": false,
+          "skillId": "agnes-ai-generation",
+          "tooltip": "调用 Agnes AI 图片生成 API，根据文字描述生成高质量图片。支持多种尺寸和风格，适用于封面配图、插图、背景图等场景。",
+          "keyword": "生成图片、AI 画图、文生图、Agnes Image、text-to-image",
+          "case": [
+            "生成一张城市日出的风景图片",
+            "画一只在草地上奔跑的柯基犬",
+            "生成一张科技风格的背景图",
+            "做一张产品宣传海报图"
+          ],
+          "prompt": "请使用 agnes-ai-generation 技能，根据以下描述生成图片并保存到用户的文件夹下。\n\n【用户描述如下】"
         },
         {
-          "name": "图生文",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "图生文",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 图生文 技能，"
+          "name": "图片编辑",
+          "developing": false,
+          "skillId": "agnes-ai-generation",
+          "tooltip": "调用 Agnes AI 图片编辑 API，基于现有图片进行风格转换、内容修改、增强处理等操作。适用于图片风格化、背景替换、细节调整等场景。",
+          "keyword": "图片编辑、图生图、风格转换、Agnes Image、image-to-image、编辑图片",
+          "case": [
+            "把这张照片转成赛博朋克风格",
+            "将这张图的水印去除并增强画质",
+            "把这张产品图换成白色背景",
+            "给这张人物照加上油画风格"
+          ],
+          "prompt": "请使用 agnes-ai-generation 技能，对以下图片进行编辑，并将编辑后的图片保存到用户的文件夹下。\n\n【图片位置 或 图片 URL + 编辑要求】"
         },
         {
           "name": "文本转语音",
@@ -443,7 +461,7 @@
           "tooltip": "使用 edge-tts 将文本转换为语音，支持多种中文（普通话/粤语/台湾话）及英文音色，可调节语速、音调、格式（mp3 / pcm / wav）。适合需要语音播报、无障碍、驾驶/烹饪等场景。",
           "keyword": "转成语音、转成MP3",
           "case": "把 公司简介.md 转成 mp3 音频（用云扬声音）",
-          "prompt": "请使用 edge-tts 技能，把以下文本转成语音："
+          "prompt": "请使用 edge-tts 技能，把以下文本转成语音：\n\n"
         },
         {
           "name": "语音转文本",
@@ -454,20 +472,31 @@
           "prompt": "[开发中] 请使用 语音转文本 技能，"
         },
         {
-          "name": "视频制作",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "视频制作",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 视频制作 技能，"
+          "name": "视频生成",
+          "developing": false,
+          "skillId": "agnes-ai-generation",
+          "tooltip": "调用 Agnes AI 视频生成 API，根据文字描述或图片生成高质量视频。支持文本生成视频、图片生成视频、多图关键帧动画等模式。",
+          "keyword": "生成视频、AI 做视频、视频制作、Agnes Video、text-to-video、image-to-video",
+          "case": [
+            "根据这段描述生成一段 10 秒的产品展示视频",
+            "把这张静态产品图转成动态展示视频",
+            "用两张图片做一段平滑转场动画",
+            "生成一段城市夜景的延时视频"
+          ],
+          "prompt": "请使用 agnes-ai-generation 技能，根据以下要求生成视频并保存到用户的文件夹下。视频生成是异步任务，创建任务后请轮询获取结果。\n\n【视频生成要求描述】"
         },
         {
           "name": "视频总结",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "视频总结",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 视频总结 技能，"
+          "developing": false,
+          "skillId": "agnes-ai-generation",
+          "tooltip": "获取视频内容并进行智能总结。先通过 Agnes 或其他方式获取视频内容，然后提取关键信息、生成内容摘要和要点笔记。",
+          "keyword": "视频总结、总结视频、视频摘要、视频要点、video summary",
+          "case": [
+            "总结这个培训视频的核心内容",
+            "提取这个会议录像的关键决策点",
+            "给这个产品介绍视频写一段摘要"
+          ],
+          "prompt": "请使用 agnes-ai-generation 技能获取视频内容，然后对视频进行总结分析。如果视频有可访问的 URL，先获取视频内容；然后提取关键信息、主要论点和重要细节，生成结构化总结。\n\n"
         }
       ]
     },
