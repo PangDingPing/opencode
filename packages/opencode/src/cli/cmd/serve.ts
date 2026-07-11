@@ -7,6 +7,7 @@ import { User } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
 import { count } from "drizzle-orm"
 import { UserTable } from "@opencode-ai/core/user/sql"
+import { readFile } from "node:fs/promises"
 
 /**
  * 启动引导：首次启动时创建 admin 账号
@@ -33,6 +34,55 @@ function bootstrapAdmin() {
   })
 }
 
+/**
+ * 启动引导：从 OPENCODE_SEED_USERS_FILE 预置多用户
+ * - 文件格式：[{ "username": "...", "password": "...", "role": "admin" | "user", "displayName": "..." }, ...]
+ * - 已存在的 username 跳过（保留原密码 / role）
+ * - 未设环境变量 / 文件不存在 / 文件格式错 → 静默跳过（不阻塞启动）
+ */
+function bootstrapUsers() {
+  return Effect.gen("Cli.serve.bootstrapUsers", function* () {
+    const seedFile = process.env.OPENCODE_SEED_USERS_FILE
+    if (!seedFile) return
+
+    let raw: string
+    try {
+      raw = yield* Effect.promise(() => readFile(seedFile, "utf-8"))
+    } catch (e) {
+      console.warn(`[bootstrapUsers] 跳过：读取种子文件失败 ${seedFile} (${(e as Error).message})`)
+      return
+    }
+
+    let seedUsers: Array<{ username: string; password: string; role: "admin" | "user"; displayName?: string }>
+    try {
+      seedUsers = JSON.parse(raw)
+    } catch (e) {
+      console.warn(`[bootstrapUsers] 跳过：种子文件 JSON 解析失败 (${(e as Error).message})`)
+      return
+    }
+
+    const userSvc = yield* User.Service
+    for (const u of seedUsers) {
+      const exists = yield* userSvc.getByUsername(u.username)
+      if (exists) {
+        console.log(`[bootstrapUsers] 用户已存在，跳过: ${u.username}`)
+        continue
+      }
+      try {
+        yield* userSvc.createUser({
+          username: u.username,
+          password: u.password,
+          role: u.role,
+          displayName: u.displayName,
+        })
+        console.log(`[bootstrapUsers] 已创建预置用户: ${u.username} (${u.role})`)
+      } catch (e) {
+        console.error(`[bootstrapUsers] 创建用户失败 ${u.username}: ${(e as Error).message}`)
+      }
+    }
+  })
+}
+
 export const ServeCommand = effectCmd({
   command: "serve",
   builder: (yargs) => withNetworkOptions(yargs),
@@ -52,6 +102,12 @@ export const ServeCommand = effectCmd({
       Effect.provide(Database.defaultLayer),
       Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
       Effect.provide(Layer.merge(AuthToken.defaultLayer, Database.defaultLayer)),
+    )
+
+    // 启动引导：从种子文件预置多用户（admin 创建后跑，便于多用户场景）
+    yield* bootstrapUsers().pipe(
+      Effect.provide(Database.defaultLayer),
+      Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
     )
 
     const opts = yield* resolveNetworkOptions(args)
