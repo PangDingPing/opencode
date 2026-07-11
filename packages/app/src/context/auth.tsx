@@ -47,7 +47,7 @@ const ChangePasswordPage = lazy(() => import("@/pages/change-password"))
 
 // AuthGate：未登录显示登录页，登录后注入 UserContext
 export function AuthGate(props: ParentProps) {
-  const [me, { refetch }] = createResource(fetchMe)
+  const [me] = createResource(fetchMe)
 
   return (
     <Show
@@ -60,7 +60,7 @@ export function AuthGate(props: ParentProps) {
     >
       <Show
         when={me()}
-        fallback={<Dynamic component={LoginPage} onLoginSuccess={() => refetch()} />}
+        fallback={<Dynamic component={LoginPage} />}
       >
         {(user) => (
           <UserContext.Provider value={user()}>

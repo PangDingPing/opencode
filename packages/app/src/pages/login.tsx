@@ -1,9 +1,10 @@
 import { createSignal, Show, type Component } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { useLanguage } from "@/context/language"
+import { navigateToDefaultProject } from "@/utils/default-project"
 
-// 登录页：用户名 + 密码表单，登录成功后回调 onLoginSuccess
-const LoginPage: Component<{ onLoginSuccess: () => void }> = (props) => {
+// 登录页：用户名 + 密码表单，登录成功后跳转到默认项目
+const LoginPage: Component = () => {
   const language = useLanguage()
   const [username, setUsername] = createSignal("")
   const [password, setPassword] = createSignal("")
@@ -38,8 +39,8 @@ const LoginPage: Component<{ onLoginSuccess: () => void }> = (props) => {
         return
       }
 
-      // 登录成功，触发上层 refetch
-      props.onLoginSuccess()
+      // yejian: 登录成功，跳转到默认项目（整页刷新，确保项目状态完全重载）
+      navigateToDefaultProject()
     } catch {
       setError("网络错误，请重试")
       setLoading(false)
