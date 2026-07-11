@@ -1,4 +1,4 @@
-import { hash, verify } from "@node-rs/argon2"
+import { scryptSync, randomBytes, timingSafeEqual } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 import { Context, Effect, Layer, Schema } from "effect"
 import { Database } from "../database/database"
@@ -6,12 +6,46 @@ import { UserTable, type Role } from "./sql"
 import { loadAllowedNames } from "./allowed-names"
 import { LayerNode } from "../effect/layer-node"
 
-// argon2id 参数（OWASP 2024 推荐）
-const ARGON2_OPTIONS = {
-  memoryCost: 19456,
-  timeCost: 2,
-  parallelism: 1,
-} as const
+// scrypt 参数（OWASP 2024 推荐：N=2^14, r=8, p=1）
+// 用 node:crypto.scryptSync 跨平台，避免 @node-rs/argon2 在 bun build 跨平台打包时
+// 硬编码 Windows native binding 路径，导致 Linux 容器启动崩（TypeError: must be absolute path）
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keylen: 64 } as const
+
+// 把 scryptSync 异步化以便跟原 argon2 异步签名保持一致
+function hashPassword(pwd: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const salt = randomBytes(16)
+      const hash = scryptSync(pwd, salt, SCRYPT_PARAMS.keylen, {
+        N: SCRYPT_PARAMS.N,
+        r: SCRYPT_PARAMS.r,
+        p: SCRYPT_PARAMS.p,
+      })
+      resolve(`${salt.toString("hex")}:${hash.toString("hex")}`)
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+function verifyPasswordHash(stored: string, pwd: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    try {
+      const [saltHex, hashHex] = stored.split(":")
+      if (!saltHex || !hashHex) return resolve(false)
+      const salt = Buffer.from(saltHex, "hex")
+      const expected = Buffer.from(hashHex, "hex")
+      const actual = scryptSync(pwd, salt, expected.length, {
+        N: SCRYPT_PARAMS.N,
+        r: SCRYPT_PARAMS.r,
+        p: SCRYPT_PARAMS.p,
+      })
+      resolve(actual.length === expected.length && timingSafeEqual(actual, expected))
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
 
 // 密码强度校验：至少 8 位 + 含字母 + 含数字
 export function validatePassword(pwd: string): boolean {
@@ -68,7 +102,7 @@ function makeService(): UserServiceIface {
     }
     const { db } = yield* Database.Service
     const id = "usr_" + input.username
-    const passwordHash = yield* Effect.promise(() => hash(input.password, ARGON2_OPTIONS))
+    const passwordHash = yield* Effect.promise(() => hashPassword(input.password))
     const now = Date.now()
     yield* db
       .insert(UserTable)
@@ -157,7 +191,7 @@ function makeService(): UserServiceIface {
       return yield* Effect.fail(new Error("密码至少 8 位且必须包含字母和数字"))
     }
     const { db } = yield* Database.Service
-    const passwordHash = yield* Effect.promise(() => hash(newPassword, ARGON2_OPTIONS))
+    const passwordHash = yield* Effect.promise(() => hashPassword(newPassword))
     yield* db
       .update(UserTable)
       .set({ password_hash: passwordHash, must_change_password: 0, time_updated: Date.now() })
@@ -172,7 +206,7 @@ function makeService(): UserServiceIface {
       return yield* Effect.fail(new Error("密码至少 8 位且必须包含字母和数字"))
     }
     const { db } = yield* Database.Service
-    const passwordHash = yield* Effect.promise(() => hash(newPassword, ARGON2_OPTIONS))
+    const passwordHash = yield* Effect.promise(() => hashPassword(newPassword))
     yield* db
       .update(UserTable)
       .set({ password_hash: passwordHash, must_change_password: 1, time_updated: Date.now() })
