@@ -60,7 +60,9 @@ export const defaultLayer = Layer.unwrap(
 
 export const node = LayerNode.make(layerFromPath(path()), [])
 
-// 别名：让 `import { Database } from "..."` 后能用 Database.Service / .defaultLayer / .node
-// 旧写法 `export { Service as Database }` 只把 Service 类重命名为 Database，但 defaultLayer/node 是顶层 const，无法作为 Service 类的属性
-// 所以用一个对象把三者打包后作为 Database 导出
-export const Database = { Service, defaultLayer, node }
+// 自引用命名空间导出：Bun compile 后 `export const Database = {...}` 会因模块
+// lazy loading 顺序问题导致 `Database` 在被引用时仍是 undefined（xd.node 报错）。
+// 自引用 `export * as Database from "./database"` 创建 live binding namespace，
+// namespace 对象本身始终存在，属性在模块体执行后填充，避免 undefined 错误。
+// 与 global.ts 的 `export * as Global from "./global"` 模式一致。
+export * as Database from "./database"
