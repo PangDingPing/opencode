@@ -171,12 +171,15 @@ function escapeTemplate(line: string) {
 }
 
 function renderRegistry(names: string[]) {
+  // 使用静态 import 而非顶层 await + 动态 import。
+  // 原因：Bun compile + splitting:true 会把动态 import 分割成 chunk 文件，
+  // 但 chunk 没有被嵌入 binary 的 bunfs，导致运行时 import 失败并死锁。
+  // 静态 import 确保所有迁移模块被嵌入 binary。
+  const imports = names.map((name, i) => `import m${String(i).padStart(2, "0")} from "./migration/${name}"`).join("\n")
+  const refs = names.map((_, i) => `m${String(i).padStart(2, "0")}`).join(", ")
   return `import type { DatabaseMigration } from "./migration"
+${imports}
 
-export const migrations = (
-  await Promise.all([
-${names.map((name) => `    import("./migration/${name}"),`).join("\n")}
-  ])
-).map((module) => module.default) satisfies DatabaseMigration.Migration[]
+export const migrations: DatabaseMigration.Migration[] = [${refs}]
 `
 }
