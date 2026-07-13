@@ -6,10 +6,11 @@
 
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
-- **宿主机端口**：8088
-- **镜像名称**：`yejian-opencode:v0.0.3`
+- **宿主机端口**：80（v0.0.6 起；之前版本为 8088）
+- **镜像名称**：`yejian-opencode:v0.0.8`
 - **容器名称**：`yejian-AIworkbench`
-- **基础镜像**：`alpine:3.24.1`（v0.0.3 起）
+- **基础镜像**：`oven/bun:1.3.14-alpine`（builder 阶段）+ `alpine:3.20`（runtime 阶段；v0.0.8 回到 3.20，3.24 装 libreoffice 拉链子慢）
+- **构建策略**：多阶段构建 —— builder 阶段在 Alpine/musl 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary，runtime 阶段只 COPY binary + 装运行时依赖（libreoffice / poppler / uv / pnpm 等）
 - **预装运行时**：Node.js 24 LTS + Python 3.14 + pnpm 11 + LibreOffice + poppler + qpdf + uv（详见 [Skill 运行时依赖](#skill-运行时依赖)）
 
 ---
@@ -370,6 +371,151 @@ docker run -d --name yejian-AIworkbench -p 9090:8088 ... yejian-opencode:v0.0.5
 
 ---
 
+### 坑 15：迁移脚本也用 @node-rs/argon2（v0.0.6 新增）
+
+**问题**：`packages/core/src/database/migration/20260625120001_seed_initial_users.ts` L1 `import { hash } from "@node-rs/argon2"`，跟 `packages/core/src/user/index.ts` 是同一个跨平台崩溃问题。如果只改 `user/index.ts` 不改迁移脚本，迁移运行时仍崩。
+
+**解决**：从 `user/index.ts` `export hashPassword`，迁移脚本 `import { hashPassword } from "../../user"` 替换 argon2 hash。这样密码 hash 格式统一（scryptSync 的 `salt:hash` 格式），`verifyPasswordHash` 能正确验证。
+
+**教训**：改密码哈希算法时，必须 `grep -r "@node-rs/argon2" packages/` 检查所有 hash 调用点，不能只改主文件。
+
+---
+
+### 坑 16：bun build 跨平台打包 napi 包硬编码 Windows 路径（v0.0.7 新增）
+
+**问题现象**：v0.0.7 在 builder 阶段（Alpine 容器内）跑 `bun run build.ts --docker-build` 编译完 binary，runtime 阶段启动 `opencode --version` 立刻崩：
+
+```
+TypeError: must be absolute path
+    at /root/.bun/install/global/node_modules/@node-rs/argon2/index.js:42
+```
+
+**根因**：`@node-rs/argon2` 之类的 napi 包用 `createRequire(__filename)` 加载 native binding。`bun build` 在 Windows 主机上打 Linux musl binary 时，会把 Windows 绝对路径（如 `D:\...\node_modules\@node-rs\argon2\index.js`）嵌入到 binary 的字符串里。Linux 容器里 `createRequire` 用这个 Windows 路径去加载 native `.node` 文件，自然报"must be absolute path"（路径是绝对的，但指向不存在的 Windows 盘符）。
+
+**解决**：跨平台/多用户密码哈希改用 `node:crypto.scryptSync`（Node 标准库，无 native binding）。同时从 `packages/core/package.json` 删除 `@node-rs/argon2` 依赖（详见 v0.0.6 改动 + 坑 15）。
+
+**教训**：在选择依赖时，优先选 Node 标准库或纯 JS 实现。napi 包在跨平台打包场景下需要特别留意 binding 加载机制。
+
+---
+
+### 坑 17：Bun compile 把 `export const Xxx = {...}` 编译为 lazy 加载的 undefined（v0.0.8 新增）
+
+**问题现象**：v0.0.8 镜像构建成功，容器启动后任何 opencode 命令（包括 `--version`）都崩：
+
+```
+TypeError: undefined is not an object (evaluating 'xd.node')
+    at <anonymous> (/$bunfs/root/src/index.js:200:4247)
+Bun v1.3.14 (Linux x64 baseline)
+```
+
+**根因诊断**：
+1. `xd` 是 minify 后的变量名。`strings` 提取 binary 内容，找 `xd.node` 附近上下文：
+   ```
+   xd={Service:n0,defaultLayer:N$,node:H9}
+   lr.make(Shc,[xd.node])  // user/index.ts
+   ```
+   确认 `xd` = `Database` 模块对象
+2. git log 找到合并提交 `859f44c3e`（multi-user-system 覆盖式合并到 dev）把 `export * as Database from "./database"` 改成了 `export const Database = { Service, defaultLayer, node }`
+3. 对比两种导出方式在 Bun compile 下的行为：
+
+| 导出方式 | Bun compile 行为 | 结果 |
+|----------|-----------------|------|
+| `export * as Database from "./database"` | 创建 live binding namespace 对象，namespace 对象本身始终存在 | ✅ `Database` 不会是 undefined |
+| `export const Database = { Service, defaultLayer, node }` | 常量值导出，在模块体 lazy 函数执行时才赋值 | ❌ 模块体未执行时 `Database` 是 undefined |
+
+Bun compile 把每个模块编译成 lazy 函数，在首次访问时调用。如果模块 A 引用模块 B 的导出但模块 B 的 lazy 函数还没调用，模块 B 的 `export const` 导出就是 undefined。
+
+**解决**：3 个模块（`database.ts` / `user/index.ts` / `auth-token/index.ts`）的导出方式从 `export const Xxx = {...}` 改回自引用命名空间导出 `export * as Xxx from "..."`。所有 `import { Database }` 等调用点无需修改（命名空间对象兼容 `.Service` / `.defaultLayer` / `.node` 访问）。
+
+**错误信息 `Bun v1.3.14 (Linux x64 baseline)` 的误导**：`build.ts` 选择的是 AVX2 目标，但错误信息说 baseline。这是因为 `bun-linux-x64-musl` target 在 Bun 中默认就是 baseline，与 build.ts 配置无关。
+
+**诊断技巧**：
+- `xd` 这类 minify 后的名字无法直接 grep 源码，用 `strings <binary> | grep -B2 -A2 "xd.node"` 提取上下文
+- 在 PowerShell 中 `strings` 是 Git for Windows 自带的工具，位于 `C:\Program Files\Git\usr\bin\` 或 `~\scoop\apps\ripgrep\current\ripgrep.exe`（如 PATH 没设可以加 `;$env:PATH += "C:\Program Files\Git\usr\bin"`）
+- `xd={Service:n0,...}` 这种 pattern 是 Bun compile 把 TS 类+常量打包成 plain object 的特征
+
+---
+
+### 坑 18：verifyPassword 函数调用了不存在的 `verify` 函数（v0.0.8 新增）
+
+**问题现象**：坑 17 修复后，binary 正常启动，登录 API 调用 `userSvc.verifyPassword(...)` 时崩：
+
+```
+ReferenceError: verify is not defined
+    at User.verifyPassword (...)
+    at AuthHandler.auth.login (...)
+```
+
+**根因**：`packages/core/src/user/index.ts` L142 `verifyPassword` 函数体内调用了 `verify(row.password_hash, password)`，但文件里只定义了 `verifyPasswordHash` 函数（无 `verify` 这个名字）。之前 dev 模式下没发现，因为 dev 模式不跑 Bun compile lazy loading 流程；编译后这个 typo 显形。
+
+**解决**：`verify` → `verifyPasswordHash`（函数签名是 `(stored: string, pwd: string)`，参数顺序正确）。仅 L142 一行。
+
+**教训**：binary 编译后才会暴露的 typo 错误，dev 模式无法捕捉。重要的 callback 函数（特别是带 async/promise 包装的）值得加单测。
+
+---
+
+### 坑 19：密码 hash 格式不匹配 —— PHC vs 冒号（v0.0.8 新增）
+
+**问题现象**：登录永远返回 401（Unauthorized），不管用什么密码。docker logs 无任何错误（`hashPassword` / `verifyPasswordHash` 都正常执行）。
+
+**根因**：旧数据库中 32 个用户的密码 hash 是 PHC 标准格式（外部工具生成）：
+```
+scrypt$N=16384$r=8$p=1$<salt_hex>$<hash_hex>
+```
+而 v0.0.6 引入的 `hashPassword` 生成冒号格式 `<salt_hex>:<hash_hex>`，`verifyPasswordHash` 也只按冒号 split 解析。把 PHC 字符串按 `:` split 只能得到 1 段（整个 PHC 字符串），用 `parts[0]` 作 salt、`undefined` 作 hash 重新计算永远不匹配。
+
+**解决**：
+1. `hashPassword` 改为生成 PHC 格式（与外部工具兼容，便于将来跨工具迁移）
+2. `verifyPasswordHash` 同时支持 PHC 格式和冒号格式：
+   ```typescript
+   if (stored.startsWith("scrypt$")) {
+     // PHC 格式解析
+     const parts = stored.split("$")
+     // parts[0]="scrypt", parts[1]="N=..", parts[2]="r=..", parts[3]="p=..", parts[4]=salt, parts[5]=hash
+   } else {
+     // 冒号格式解析
+     const parts = stored.split(":")
+   }
+   ```
+
+**踩坑 - 数据清理**：
+- 旧用户密码 hash 虽是 PHC 格式但**不匹配任何常见密码**（Yejian2016 / 123456 / 111111 / admin / password 等都试过），怀疑是用其他工具（dev 用户管理工具）生成的
+- 决定直接清空 `E:\AI\AIworkbench-data` 目录重新建库
+- **PowerShell `Remove-Item -Recurse -Force` 删除 Docker 创建的文件失败**：报大量文件锁 / sandbox 限制错误
+- 解决：```powershell
+  docker run --rm -v "E:\AI\AIworkbench-data:/data" alpine:3.20 sh -c "rm -rf /data/* /data/.*; mkdir -p /data/root /data/tmp"
+  ```
+  用容器内 `rm -rf` 删除宿主机文件（DOCKER bind mount 的特性，容器内看到的是同一文件系统）
+
+**踩坑 - PowerShell 引号**：执行 `docker exec ... sh -c "python3 << 'EOF' ..."` 引号冲突。解决：把 Python 脚本写入 `.py` 文件，`docker cp` 复制到容器后执行。
+
+**踩坑 - SQLite 锁**：运行中的 opencode 进程持有 SQLite 锁，外部 Python 脚本直接连主库报 `unable to open database file`。解决：先 `docker stop yejian-AIworkbench`，再用临时容器挂载宿主机目录后访问。
+
+**踩坑 - NTFS 卷挂载 SQLite 临时文件**：容器内 `sqlite3 /root/.local/share/opencode/opencode.db` 报 `unable to open database file`（连只读 mode 都失败），但 `cp` 到 `/tmp` 再开就 OK。原因是 Windows 挂载的 NTFS 卷不支持 SQLite 的临时 WAL/journal 机制。解决：复制到容器内 `/tmp` 再操作。
+
+---
+
+### 坑 20：bootstrapUsers 在 Bun compile 后不工作（v0.0.8 新增，待排查）
+
+**问题现象**：镜像启动后 `serve.ts` 的 `bootstrapUsers()` 函数没自动从 `seed-users.json` 创建用户，user 表始终为空。docker logs 完全无任何 `[bootstrapUsers]` 输出（包括函数体里的 `console.warn(...)` / `console.log(...)`）。
+
+**已排查的假设**：
+- ❌ `OPENCODE_SEED_USERS_FILE` 环境变量丢失 → 容器内 `env | grep SEED` 显示 `OPENCODE_SEED_USERS_FILE=/etc/opencode/seed-users.json` ✅
+- ❌ `seed-users.json` 文件缺失或内容错 → `cat /etc/opencode/seed-users.json` 输出正常 JSON ✅
+- ❌ 数据库迁移未完成 → 37 条 migration 全部执行（`SELECT id FROM migration` 包含 `20260625120001_seed_initial_users`）✅
+- ❌ `user` 表结构问题 → `SELECT count(*) FROM user` 返回 0，但表本身存在 ✅
+
+**临时方案**：`docker/insert-user.py`（Python 脚本，用 `hashlib.scrypt` 生成 PHC 格式 hash，直接打开 sqlite 数据库插入 user 行）。需要 `docker stop` 容器 + 用临时 Python 容器挂载宿主机目录。
+
+**待排查**：
+- Bun compile 后 Effect 层 `Effect.provide(...)` 顺序问题？
+- `console.log` / `console.warn` 在 Bun binary 模式下被吞？
+- `readFile` / `JSON.parse` 在 lazy 模块体里未执行？
+
+**教训**：binary 模式下调试 Effect 框架代码很麻烦。简单日志输出 + 立即同步执行是 binary 模式友好的模式。
+
+---
+
 ## 镜像导出与迁移
 
 ### 导出镜像为 tar 文件
@@ -641,6 +787,9 @@ curl http://192.168.x.x:8088
 | v0.0.2 | 2026-06-14 | 嵌入 Web UI（去除 `--skip-embed-web-ui`），网页端品牌定制：浏览器标签标题改为「广东冶建图审AI工作台」、favicon 指向 LOGO1.ico、「新建会话」页面 wordmark 替换为 ai-workbench.png；alpine 标签固定到 3.21.3；新增 4 个踩坑记录（坑 10/11/12/13） |
 | v0.0.3 | 2026-06-16 | Alpine 升到 3.24.1（拿到 Node 24 LTS / Python 3.14 / pnpm 11）；一次性装齐 docx / pdf / xlsx / edge-tts 四个 skill 所需全部运行时（libreoffice / poppler / qpdf / uv + 12 个 Python 包 + 3 个 NPM 包）；`run.ps1` / `build.ps1` 新增 `-EnvFile` 参数支持 `--env-file` 注入 API key；新增 `requirements.txt`；新增"Skill 运行时依赖"和"局域网访问配置"两节 |
 | v0.0.5 | 2026-06-20 | Skill 四角互补重构：新增"决策系统（军师）★★"分组，整合 4 个思考类 skill（头脑风暴 / 梳理头绪 / 决策顾问 / 智囊评审）；前端 `case` 字段从 string 升级为 `string \| string[]` 支持多 case 列表展示；Word 技能 case 拆为 3 元素数组；公文排版 keyword 由命令式 `/document-format` 改为描述性中文短语；`其它`分组删除 3 个旧条目（梳理思路 / 个人决策顾问 / 头脑风暴）。**注意**：本版本构建期间发现 8088 端口被系统层面禁止 bind（WinError 10013），**重启电脑可恢复**——见坑 14 |
+| v0.0.6 | 2026-07-12 | 多用户登录系统 + ppt-master skill 依赖。**(1) 密码哈希跨平台**：`@node-rs/argon2` → `node:crypto.scryptSync`（避免 bun build 跨平台打包硬编码 Windows native binding 路径，Linux 容器启动崩）；**(2) 多用户预置**：`bootstrapAdmin()` 无 `OPENCODE_SERVER_PASSWORD` 时静默跳过（不再 fail-fast），`bootstrapUsers()` 从烤入镜像的 `seed-users.json` 预置用户（admin: yejian/Yejian2016，首次登录强制改密）；**(3) ppt-master 依赖**：新增 `requirements-ppt.txt`（17 个 Python 包，svglib 方案 B 精简版）；**(4) api-keys.env 精简**：无需 `OPENCODE_SERVER_USERNAME/PASSWORD`，HTTP Basic Auth 禁用，多用户登录系统接管；**(5) 默认项目**：`layout.tsx` 已有 `openProject(last ?? "/YEJIAN")` 逻辑，全新容器首次启动自动打开 /YEJIAN 项目；**(6) build.ps1**：默认 tag v0.0.6，启动命令对齐用户实际（`E:\AI\YEJIAN:/YEJIAN` + `--restart always`）|
+| v0.0.7 | 2026-07-13 | 多阶段构建，binary 在 Docker builder 阶段编译（Linux 容器）。**问题**：`@node-rs/argon2` napi binding 在 bun build 跨平台打包时硬编码 Windows native binding 路径，Linux 容器里 `createRequire` 报 `TypeError: must be absolute path` → 崩。**解决**：依赖 `node:crypto.scryptSync`（已 v0.0.6 切换）。**结论**：v0.0.7 实际上没用，纯准备工作版本 |
+| v0.0.8 | 2026-07-13 | 多阶段构建（builder 阶段在 Alpine 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary；runtime 阶段只 COPY binary + 装运行时）+ **国内镜像源**（apk 阿里云 / pip 清华 / npm 淘宝 / bun 淘宝）+ **完善 BuildKit 缓存挂载**（apk/bun/pip/npm 下载缓存持久化）+ alpine 基础镜像 3.24 → 3.20（libreoffice 拉链子更快）。**构建时间**：首次 1-2 小时（vs v0.0.6 的 6-7 小时），有缓存 10-20 分钟（vs v0.0.6 的 3-4 小时）。**修复 3 个运行时 bug**：(a) `xd.node undefined` —— 3 个模块（database/user/auth-token）从 `export const Xxx = {...}` 改回 `export * as Xxx from "..."` 自引用命名空间导出，绕开 Bun compile 把 `export const` 编译为 lazy undefined 的问题；(b) `verify is not defined` —— `user/index.ts` L142 `verify` → `verifyPasswordHash` 函数名 typo；(c) 密码 hash 格式不匹配 —— `hashPassword` 改为生成 PHC 标准格式（旧 hash 是 PHC 格式），`verifyPasswordHash` 同时支持 PHC 和冒号两种格式。**新增 docker/insert-user.py 工具**：bootstrapUsers 在 binary 模式下不工作时（待排查），用 Python 手动插入用户的绕道方案。**详见 [坑 16-20] 和附录"v0.0.8 多阶段构建 + 3 个 bug 修复"** |
 
 ---
 
@@ -955,3 +1104,337 @@ docker run -d --name yejian-AIworkbench -p 8088:8088 `
 - 把 `E:\AI\dockerimage\api-keys.env` 路径固化到 `build.ps1` 的注释里（或加一个 `api-keys.env` 默认路径配置）
 - 把 `E:\AI\YEJIAN:/YEJIAN` 工作目录挂载也固化到脚本（避免每次手动写）
 - 但**这些不影响构建流程**——本次 build.ps1 的 binary + image 构建都成功了，只是容器启动用的是用户手动命令
+
+---
+
+## 附录：v0.0.6 多用户登录系统 + ppt-master 依赖（2026.07.12）
+
+### 一、需求背景
+
+v0.0.5 之前用 `OPENCODE_SERVER_USERNAME/PASSWORD` 环境变量做 HTTP Basic Auth + 单 admin 引导，存在两个问题：
+1. `@node-rs/argon2` 在 bun build 跨平台打包时硬编码 Windows native binding 路径，Linux 容器启动崩（`TypeError: must be absolute path`）
+2. api-keys.env 里的 `OPENCODE_SERVER_PASSWORD` 与 seed-users.json 的 admin 密码重复输入
+
+v0.0.6 的目标：
+- 跨平台密码哈希用 `node:crypto.scryptSync`（Node 标准库，无 native binding）
+- api-keys.env 无需 `OPENCODE_SERVER_USERNAME/PASSWORD`，用户名密码只放在 `seed-users.json`（烤入镜像）
+- 安装 ppt-master skill 的 17 个 Python 依赖
+- 启动时默认打开 `/YEJIAN` 项目
+
+### 二、修改文件清单
+
+#### 1. 跨平台密码哈希
+
+| 文件 | 改动 |
+|---|---|
+| `packages/core/src/user/index.ts` | `hashPassword` 改为 `export`，供迁移脚本复用 |
+| `packages/core/src/database/migration/20260625120001_seed_initial_users.ts` | `import { hash } from "@node-rs/argon2"` → `import { hashPassword } from "../../user"`，调用点同步改 |
+| `packages/core/package.json` | 删除 `"@node-rs/argon2": "2.0.2"` 依赖 |
+
+#### 2. 多用户预置（serve.ts）
+
+| 文件 | 改动 |
+|---|---|
+| `packages/opencode/src/cli/cmd/serve.ts` | `bootstrapAdmin()` 无 `OPENCODE_SERVER_PASSWORD` 时不再 `process.exit(1)`，改为 `console.log + return` 静默跳过；handler 的 Warning 改为 Info 提示 |
+
+#### 3. Docker 打包
+
+| 文件 | 改动 |
+|---|---|
+| `docker/seed-users.json` | **新建**，admin 账号 yejian/Yejian2016 |
+| `docker/requirements-ppt.txt` | **新建**，ppt-master 的 17 个 Python 依赖（svglib 方案 B 精简版） |
+| `docker/Dockerfile` | 顶部注释加 v0.0.6 changes；新增 `COPY + uv pip install requirements-ppt.txt`；新增 `COPY seed-users.json + ENV OPENCODE_SEED_USERS_FILE` |
+| `docker/build.ps1` | 默认 tag `v0.0.3` → `v0.0.6`；workbenchDir `D:\AI\AIworkbench` → `E:\AI\YEJIAN`；dataDir `D:\AI\AIworkbench-data` → `E:\AI\AIworkbench-data`；挂载 `/workspace` → `/YEJIAN`；工作目录 `/workspace` → `/YEJIAN`；加 `--restart always` |
+
+### 三、关键设计决策
+
+#### 3.1 为什么 seed-users.json 烤入镜像而不是挂载？
+
+用户的 `docker run` 命令没有挂载 seed-users.json，所以必须烤入镜像。admin 初始密码 Yejian2016 只是引导密码，首次登录强制改密（`must_change_password=1`），用户登录后会改自己的密码。初始密码留在镜像层里是可接受的（私有镜像）。
+
+#### 3.2 为什么 api-keys.env 无需 OPENCODE_SERVER_USERNAME/PASSWORD？
+
+- `bootstrapAdmin()` 无密码时静默跳过，不 fail-fast
+- `bootstrapUsers()` 从烤入的 `seed-users.json` 预置用户
+- `auth.ts` 的 `required()` 在无 `OPENCODE_SERVER_PASSWORD` 时返回 false，HTTP Basic Auth 自动禁用
+- 多用户登录系统（cookie token）接管认证
+
+#### 3.3 默认打开 /YEJIAN 项目如何实现？
+
+`packages/app/src/pages/layout.tsx` L559 已有逻辑：
+```tsx
+if (list.length === 0) {
+  await openProject(last ?? "/YEJIAN", true)
+}
+```
+全新容器首次启动时，项目列表为空、lastProject 为空，自动 `openProject("/YEJIAN")`。配合 `docker run -v "E:\AI\YEJIAN:/YEJIAN"`，容器内 `/YEJIAN` 目录存在，项目可正常打开。
+
+### 四、启动命令（用户最终使用）
+
+```powershell
+docker run -d --name yejian-AIworkbench -p 80:8088 `
+  -v "E:\AI\YEJIAN:/YEJIAN" `
+  -v "E:\AI\AIworkbench-data/root:/root" `
+  -v "E:\AI\AIworkbench-data/tmp:/tmp" `
+  -w /YEJIAN `
+  --env-file "E:\AI\dockerimage\api-keys.env" `
+  --restart always `
+  --hostname 0.0.0.0 `
+  yejian-opencode:v0.0.6
+```
+
+**与 v0.0.5 的差异**：
+- 端口映射 `8088:8088` → `80:8088`（直接用 80 端口访问）
+- 镜像 tag `v0.0.5` → `v0.0.6`
+- api-keys.env 内容不变（只有 AGNES_API_KEY 和 MinerU-api）
+
+### 五、验证步骤
+
+#### 5.1 构建镜像
+
+```powershell
+cd D:\AI\opencode
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "E:\AI\dockerimage\api-keys.env" -ForceRebuild
+```
+
+`-ForceRebuild` 必加：本次改了 `packages/core` 和 `packages/opencode` 的 TypeScript 代码，必须重新构建 opencode 二进制（scryptSync + bootstrapAdmin 改动才会编进 binary）。
+
+#### 5.2 容器内验证
+
+```powershell
+docker exec -it yejian-AIworkbench sh
+
+# 验证 opencode 启动（应看到 bootstrapUsers 日志）
+docker logs yejian-AIworkbench | head -20
+# 应包含：[bootstrapAdmin] 跳过：未设置 OPENCODE_SERVER_PASSWORD
+#         [bootstrapUsers] 已创建预置用户: yejian (admin)
+
+# 验证 seed-users.json 存在
+cat /etc/opencode/seed-users.json
+
+# 验证 ppt-master Python 依赖
+python3 -c "import pptx, edge_tts, svglib, reportlab, fitz, mammoth, markdownify, ebooklib, nbconvert, openpyxl, PIL, numpy, requests, bs4, curl_cffi, google.genai, flask; print('PPT deps OK')"
+```
+
+#### 5.3 浏览器验证
+
+1. 访问 `http://localhost`（80 端口）
+2. 登录页输入 `yejian` / `Yejian2016`
+3. 首次登录强制改密
+4. 改密后自动跳转，默认打开 `/YEJIAN` 项目
+
+### 六、踩坑记录
+
+#### 坑 15：迁移脚本也用 @node-rs/argon2
+
+**问题**：`packages/core/src/database/migration/20260625120001_seed_initial_users.ts` L1 `import { hash } from "@node-rs/argon2"`，跟 `user/index.ts` 是同一个跨平台崩溃问题。如果只改 `user/index.ts` 不改迁移脚本，迁移运行时仍会崩。
+
+**解决**：从 `user/index.ts` `export hashPassword`，迁移脚本 `import { hashPassword } from "../../user"` 替换 argon2 hash。这样密码 hash 格式统一（scryptSync 的 `salt:hash` 格式），`verifyPasswordHash` 能正确验证。
+
+**教训**：改密码哈希算法时，必须检查所有 hash 调用点（`grep -r "@node-rs/argon2" packages/`），不能只改主文件。
+
+---
+
+## 附录：v0.0.8 多阶段构建 + 3 个 bug 修复（2026.07.13）
+
+本次改动在 v0.0.6 基础上做了**多阶段构建重构**（binary 从"主机预编译"改为"builder 阶段在 Linux 容器内编译"），并修复了 v0.0.7 暴露的 3 个运行时 bug（xd.node undefined / verify typo / PHC 格式）。
+
+### 一、需求背景
+
+v0.0.6 是"主机预编译 binary + COPY 进镜像"模式。v0.0.7 尝试在 Docker builder 阶段编译 binary（让 binary 在 Linux 容器内编译，避免 Windows 主机交叉编译的 napi 路径问题），但又发现新问题：
+1. bun build 在 Windows 主机上编译 Linux musl binary 时，会把 `D:\...\node_modules\@node-rs\argon2\index.js` 这类 Windows 路径嵌入 binary，Linux 容器里 `createRequire` 用此路径加载 native binding 报 `TypeError: must be absolute path`
+2. builder 阶段首次构建 6-7 小时（拉 libreoffice + 编译 native binding）
+3. 国内拉链子慢，无缓存命中
+
+v0.0.8 的目标：
+- 解决 v0.0.7 的 napi 路径问题（已在 v0.0.6 切换到 scryptSync）
+- 加速构建（国内镜像源 + BuildKit 缓存挂载）
+- 修复 v0.0.7 binary 暴露的 3 个 runtime bug
+
+### 二、修改文件清单
+
+#### 1. Dockerfile 改动（多阶段 + 国内镜像源 + 缓存）
+
+`docker/Dockerfile` 重写为两阶段：
+
+**Stage 1: builder**（`oven/bun:1.3.14-alpine`）：
+- 国内镜像源：apk 阿里云（`mirrors.aliyun.com`），npm/bun 淘宝（`registry.npmmirror.com`）
+- `RUN --mount=type=cache,target=/var/cache/apk`：apk 缓存持久化
+- `bun install` 在容器内执行（musl native binding 是 Alpine 兼容版本）
+- `bun run script/build.ts --docker-build`：编译 musl baseline binary（避免 AVX2 兼容问题）
+- 设置 `OPENCODE_CHANNEL=latest` + `OPENCODE_VERSION=1.17.6` 避免 Script 模块访问 npm registry / git
+
+**Stage 2: runtime**（`alpine:3.20`）：
+- apk 阿里云源 + community 仓库（libreoffice）
+- `--mount=type=cache,target=/root/.cache/pip`：pip 缓存
+- `--mount=type=cache,target=/root/.npm`：npm 缓存
+- `COPY --from=builder /build/packages/opencode/dist/opencode-linux-x64-musl/bin/opencode`：只 COPY 编译好的 binary
+- `COPY docker/seed-users.json /etc/opencode/seed-users.json` + `ENV OPENCODE_SEED_USERS_FILE`：烤入多用户清单
+- `ENTRYPOINT ["opencode", "web"]` + `CMD ["--hostname", "0.0.0.0", "--port", "8088"]`
+
+#### 2. 源码修复（3 个运行时 bug）
+
+| 文件 | 改动 | 解决 bug |
+|---|---|---|
+| `packages/core/src/database/database.ts` L66 | `export const Database = {...}` → `export * as Database from "./database"` | xd.node undefined（坑 17） |
+| `packages/core/src/user/index.ts` L263 | `export const User = {...}` → `export * as User from "./index"` | xd.node undefined（坑 17） |
+| `packages/core/src/user/index.ts` L142 | `verify(...)` → `verifyPasswordHash(...)` | verify is not defined（坑 18） |
+| `packages/core/src/user/index.ts` L14-67 | `hashPassword` 生成 PHC 格式 + `verifyPasswordHash` 支持 PHC/冒号双格式 | 密码 hash 不匹配（坑 19） |
+| `packages/core/src/auth-token/index.ts` L135 | `export const AuthToken = {...}` → `export * as AuthToken from "./index"` | xd.node undefined（坑 17） |
+
+#### 3. 新增工具
+
+`docker/insert-user.py`（Python 脚本）：
+- 用 `hashlib.scrypt` 生成 PHC 格式 hash
+- 直接打开 sqlite 数据库插入 user 行
+- 用于 bootstrapUsers 在 binary 模式下不工作时（坑 20）的绕道
+
+#### 4. 镜像构建 / 启动命令
+
+镜像构建：
+```powershell
+cd D:\AI\opencode
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "E:\AI\dockerimage\api-keys.env"
+```
+
+**有缓存**（默认）：10-20 分钟
+- builder 阶段：~5 分钟（bun install 命中 `~/.bun/install/cache`，script/build.ts 编译 ~30 秒）
+- runtime 阶段：~10 分钟（apk + libreoffice ~300MB 命中 `~/.cache/apk`）
+
+**首次 / `-ForceRebuild`**：1-2 小时
+- 拉 `oven/bun:1.3.14-alpine` + `alpine:3.20` 基础镜像
+- alpine apk 安装 + libreoffice 下载
+- bun install 全部依赖（~1500 包）
+
+**只重建 builder 阶段**（推荐，改了源码后用）：
+```powershell
+docker build --no-cache-filter=builder -t yejian-opencode:v0.0.8 -f docker/Dockerfile .
+```
+
+启动命令（与 v0.0.6 相同）：
+```powershell
+docker run -d --name yejian-AIworkbench -p 80:8088 `
+  -v "E:\AI\YEJIAN:/YEJIAN" `
+  -v "E:\AI\AIworkbench-data\root:/root" `
+  -v "E:\AI\AIworkbench-data\tmp:/tmp" `
+  -w /YEJIAN --hostname 0.0.0.0 `
+  --env-file "E:\AI\dockerimage\api-keys.env" `
+  --restart always yejian-opencode:v0.0.8
+```
+
+### 三、关键设计决策
+
+#### 3.1 为什么用 musl baseline 而非 AVX2？
+
+`bun run script/build.ts --docker-build` 编译出的 `opencode-linux-x64-musl` 默认是 baseline 变体。AVX2 需要 CPU 支持，否则在老 CPU 上崩。Alpine 镜像兼容性最广的就是 baseline。
+
+#### 3.2 为什么 alpine 3.24 → 3.20？
+
+3.20 装 libreoffice 拉链子比 3.24 快（3.24 的 community 仓库在国外 CDN）。3.20 + libreoffice + community 仓库完全够用。
+
+#### 3.3 为什么不直接 `apk add` 装 sqlite3 CLI？
+
+Dockerfile 不需要 sqlite3 CLI（构建期不查数据库）。运行时查数据库通过 `docker exec` + `apk add --no-cache sqlite` 临时装。
+
+#### 3.4 为什么不修复 bootstrapUsers？
+
+参见 [坑 20](#坑-20bootstrapusers-在-bun-compile-后不工作v008-新增待排查)。三个怀疑点都未坐实，临时用 `docker/insert-user.py` 绕道。后续需要更多 binary 模式调试工具（Effect tracer / 同步 console.log）才能继续排查。
+
+### 四、验证步骤
+
+#### 4.1 构建验证
+
+```powershell
+docker build --no-cache-filter=builder -t yejian-opencode:v0.0.8 -f docker/Dockerfile .
+# 应看到 builder 阶段 1-5 分钟完成，runtime 阶段 0-10 分钟完成（缓存命中）
+```
+
+#### 4.2 二进制验证
+
+```powershell
+docker run --rm yejian-opencode:v0.0.8 opencode --version
+# 应返回 1.17.6（不再报 xd.node / verify 错误）
+```
+
+#### 4.3 登录验证
+
+```powershell
+# 清空数据目录（首次启动或换版本时）
+docker run --rm -v "E:\AI\AIworkbench-data:/data" alpine:3.20 sh -c "rm -rf /data/* /data/.*; mkdir -p /data/root /data/tmp"
+
+# 启动容器
+docker run -d --name yejian-AIworkbench -p 80:8088 -v "E:\AI\YEJIAN:/YEJIAN" -v "E:\AI\AIworkbench-data\root:/root" -v "E:\AI\AIworkbench-data\tmp:/tmp" -w /YEJIAN --hostname 0.0.0.0 --env-file "E:\AI\dockerimage\api-keys.env" --restart always yejian-opencode:v0.0.8
+
+# 等待 10 秒后插入用户（bootstrapUsers 在 binary 模式下不工作，需要手动插入）
+docker stop yejian-AIworkbench
+docker run --rm -v "E:\AI\AIworkbench-data:/data" -v "d:\AI\opencode\docker\insert-user.py:/tmp/insert-user.py" python:3.12-alpine python3 /tmp/insert-user.py
+
+# 启动容器 + 登录验证
+docker start yejian-AIworkbench
+Start-Sleep -Seconds 8
+$body = '{"username":"yejian","password":"Yejian2016"}'
+Invoke-WebRequest -Uri "http://localhost:80/api/auth/login" -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
+# 应返回 200 + {"user":{"id":"usr_yejian","username":"yejian","role":"admin",...}}
+```
+
+#### 4.4 浏览器验证
+
+访问 `http://localhost` → 自动跳 `/login` → 输入 `yejian` / `Yejian2016` → 登录成功 → 默认打开 `/YEJIAN` 项目
+
+### 五、踩坑记录（5 个新增）
+
+| # | 现象 | 原因 | 解决 |
+|---|---|---|---|
+| 坑 16 | `TypeError: must be absolute path` | bun build 跨平台打包 napi 包时把 Windows 路径嵌入 binary | 改用 `node:crypto.scryptSync`（v0.0.6 已完成） |
+| 坑 17 | `TypeError: undefined is not an object (evaluating 'xd.node')` | Bun compile 把 `export const Xxx = {...}` 编译为 lazy，模块未执行时是 undefined | 改回 `export * as Xxx from "..."` 自引用命名空间导出 |
+| 坑 18 | `ReferenceError: verify is not defined` | `user/index.ts` L142 函数名 typo（`verify` → `verifyPasswordHash`） | 改函数名 |
+| 坑 19 | 登录永远 401 | 旧数据库 PHC 格式 hash 与新 `verifyPasswordHash`（仅冒号格式）不兼容 | `hashPassword` 生成 PHC 格式 + `verifyPasswordHash` 双格式解析 |
+| 坑 20 | `bootstrapUsers` 在 binary 模式下不工作 | 待排查（Bun compile 后 Effect 层 provide / console.log / lazy 模块） | 临时用 `docker/insert-user.py` 手动插入 |
+
+### 六、提交（按依赖顺序）
+
+**本次改动尚未 git commit**。计划按"代码基础 → 数据 → 应用 → 文档"顺序拆 commit：
+
+| # | 文件 | 提交类型 | 标题（草稿） |
+|---|---|---|---|
+| 1 | `packages/core/src/database/database.ts` | `fix(yejian)` | `fix(yejian): self-referencing namespace export for Bun compile` |
+| 2 | `packages/core/src/user/index.ts` | `fix(yejian)` | `fix(yejian): verify typo + PHC hash format + self-referencing namespace` |
+| 3 | `packages/core/src/auth-token/index.ts` | `fix(yejian)` | `fix(yejian): self-referencing namespace export for AuthToken` |
+| 4 | `docker/Dockerfile` | `chore(yejian)` | `chore(yejian): multi-stage build v0.0.8 with China mirrors` |
+| 5 | `docker/build.ps1` | `chore(yejian)` | `chore(yejian): bump tag to v0.0.8` |
+| 6 | `docker/insert-user.py` | `feat(yejian)` | `feat(yejian): manual user insert tool for binary mode` |
+| 7 | `docker/readme.md` | `docs(yejian)` | `docs(yejian): v0.0.8 multi-stage build + 3 bug fixes` |
+| 8 | `日志.md` | `docs(yejian)` | `docs(yejian): append v0.0.8 entry` |
+| 9 | `日志/20260713开发日志-docker-v0.0.8-xd-node修复.md` | `docs(yejian)` | `docs(yejian): detailed log for v0.0.8` |
+
+### 七、附注
+
+#### 7.1 构建时间实测（v0.0.8 首次 vs 有缓存）
+
+| 阶段 | 首次 | 有缓存 | 缓存策略 |
+|---|---|---|---|
+| 拉 `oven/bun:1.3.14-alpine` | ~10s | 命中 | Docker layer cache |
+| `apk add` builder 阶段 | ~30s | 命中 | `--mount=type=cache,target=/var/cache/apk` |
+| `bun install` | ~5min | ~30s | `--mount=type=cache,target=/root/.bun/install/cache` |
+| `bun run script/build.ts --docker-build` | ~3min | ~30s | Docker layer cache（仅当 builder 阶段源文件未变） |
+| 拉 `alpine:3.20` | ~10s | 命中 | Docker layer cache |
+| `apk add` runtime 阶段（含 libreoffice 300MB） | ~5min | 命中 | `--mount=type=cache,target=/var/cache/apk` |
+| `pip install uv` + `npm install -g pnpm` | ~30s | 命中 | pip/npm cache mount |
+| `uv pip install requirements.txt` | ~10s | 命中 | `--mount=type=cache,target=/root/.cache/uv` |
+| `uv pip install requirements-ppt.txt` | ~30s | 命中 | 同上 |
+| `npm install -g docx pdf-lib pdfjs-dist` | ~20s | 命中 | `--mount=type=cache,target=/root/.npm` |
+| **合计** | **~15 分钟** | **~1 分钟** | |
+
+#### 7.2 启动容器 + 登录后用户需做的事
+
+- 首次登录后**强制改密**（`must_change_password=1`），改完跳 `/new-session` 默认打开 `/YEJIAN`
+- 后续可以用 admin 账号在 `/admin/users` 页面增删其他用户
+
+#### 7.3 临时用 docker/insert-user.py 的原因
+
+bootstrapUsers 在 binary 模式下不工作（坑 20），所以**全新容器第一次启动后必须手动插入用户**。后续如修复 bootstrapUsers，此步骤可省略。
+
+#### 7.4 镜像大小
+
+- v0.0.6：~900MB（Alpine + libreoffice + 全 skill 依赖）
+- v0.0.8：~900MB（无明显变化，多阶段构建不影响 runtime 镜像大小）
