@@ -12,7 +12,8 @@ import { LayerNode } from "../effect/layer-node"
 const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1, keylen: 64 } as const
 
 // 把 scryptSync 异步化以便跟原 argon2 异步签名保持一致
-function hashPassword(pwd: string): Promise<string> {
+// 生成 PHC 标准格式 "scrypt$N=..$r=..$p=..$saltHex$hashHex"，与外部工具兼容
+export function hashPassword(pwd: string): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
       const salt = randomBytes(16)
@@ -21,7 +22,7 @@ function hashPassword(pwd: string): Promise<string> {
         r: SCRYPT_PARAMS.r,
         p: SCRYPT_PARAMS.p,
       })
-      resolve(`${salt.toString("hex")}:${hash.toString("hex")}`)
+      resolve(`scrypt$N=${SCRYPT_PARAMS.N}$r=${SCRYPT_PARAMS.r}$p=${SCRYPT_PARAMS.p}$${salt.toString("hex")}$${hash.toString("hex")}`)
     } catch (e) {
       reject(e)
     }
@@ -31,15 +32,34 @@ function hashPassword(pwd: string): Promise<string> {
 function verifyPasswordHash(stored: string, pwd: string): Promise<boolean> {
   return new Promise((resolve, reject) => {
     try {
-      const [saltHex, hashHex] = stored.split(":")
+      // 支持两种格式：
+      // 1. 本项目 hashPassword 生成的 "saltHex:hashHex" 格式
+      // 2. PHC 标准格式 "scrypt$N=..$r=..$p=..$saltHex$hashHex"（外部工具/旧数据）
+      let saltHex: string
+      let hashHex: string
+      let params = { N: SCRYPT_PARAMS.N, r: SCRYPT_PARAMS.r, p: SCRYPT_PARAMS.p }
+      if (stored.startsWith("scrypt$")) {
+        // PHC 格式：scrypt$N=..$r=..$p=..$salt$hash
+        const parts = stored.split("$")
+        // parts[0]="scrypt", parts[1]="N=..", parts[2]="r=..", parts[3]="p=..", parts[4]=salt, parts[5]=hash
+        for (let i = 1; i <= 3; i++) {
+          const [k, v] = parts[i]!.split("=")
+          if (k === "N") params.N = Number(v)
+          else if (k === "r") params.r = Number(v)
+          else if (k === "p") params.p = Number(v)
+        }
+        saltHex = parts[4]!
+        hashHex = parts[5]!
+      } else {
+        // 冒号格式：saltHex:hashHex
+        const parts = stored.split(":")
+        saltHex = parts[0]!
+        hashHex = parts[1]!
+      }
       if (!saltHex || !hashHex) return resolve(false)
       const salt = Buffer.from(saltHex, "hex")
       const expected = Buffer.from(hashHex, "hex")
-      const actual = scryptSync(pwd, salt, expected.length, {
-        N: SCRYPT_PARAMS.N,
-        r: SCRYPT_PARAMS.r,
-        p: SCRYPT_PARAMS.p,
-      })
+      const actual = scryptSync(pwd, salt, expected.length, params)
       resolve(actual.length === expected.length && timingSafeEqual(actual, expected))
     } catch (e) {
       reject(e)
@@ -139,7 +159,7 @@ function makeService(): UserServiceIface {
       .pipe(Effect.orDie)
     if (!row) return null
     if (row.disabled === 1) return null
-    const valid = yield* Effect.promise(() => verify(row.password_hash, password))
+    const valid = yield* Effect.promise(() => verifyPasswordHash(row.password_hash, password))
     if (!valid) return null
     return toUserInfo(row)
   })
@@ -259,5 +279,5 @@ export const defaultLayer = Layer.succeed(
 
 export const node = LayerNode.make(defaultLayer, [Database.node])
 
-// 让 `import { User }` 后能用 User.Service / .defaultLayer / .node
-export const User = { Service, defaultLayer, node }
+// 自引用命名空间导出：避免 Bun compile 后 `export const User = {...}` 的 lazy loading undefined 问题
+export * as User from "./index"
