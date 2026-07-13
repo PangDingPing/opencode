@@ -34,3 +34,12 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Build / debug artifacts
+.bun-cache/
+vendor/
+docker/debug-strace*.sh
+serve-stdout.log
+serve-stderr.log
+smoke-err.txt
+smoke-out.txt
