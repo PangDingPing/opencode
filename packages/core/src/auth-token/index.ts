@@ -131,5 +131,5 @@ export const defaultLayer = Layer.succeed(
 
 export const node = LayerNode.make(defaultLayer, [Database.node])
 
-// 让 `import { AuthToken }` 后能用 AuthToken.Service / .defaultLayer / .node
-export const AuthToken = { Service, defaultLayer, node }
+// 自引用命名空间导出：避免 Bun compile 后 `export const AuthToken = {...}` 的 lazy loading undefined 问题
+export * as AuthToken from "./index"
