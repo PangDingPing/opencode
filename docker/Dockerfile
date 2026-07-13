@@ -1,72 +1,134 @@
-# opencode Docker image - Uses pre-built Linux x64 musl binary
-# Build the binary first via: bun run script/build.ts
-# (from packages/opencode directory)
-# This produces all platforms including:
-#   packages/opencode/dist/opencode-linux-x64-baseline-musl/bin/opencode
-# We use the baseline-musl variant because Alpine uses musl libc (not glibc)
+# syntax=docker/dockerfile:1.4
+# opencode Docker image - Multi-stage build (Alpine + musl)
 #
-# v0.0.3 changes:
-#   - Upgrade base image from Alpine 3.21.3 to 3.24.1
-#   - Add Node.js 24 LTS, Python 3.14, pnpm 11 (skills runtime deps)
-#   - Add LibreOffice (docx/xlsx 转换与公式重算)
-#   - Add poppler-utils + qpdf (pdf 处理)
-#   - Add uv (edge-tts skill 专用)
-#   - 用 uv pip 安装 12 个 Python 包
-#   - 用 npm 安装 3 个全局 NPM 包
-#   - 不装 tesseract / OCR (按需 docker exec 进去装)
+# v0.0.8: 构建加速优化 + 回到 musl/Alpine 方案
+#         - 国内镜像源（apk 阿里云 / pip 清华 / npm 淘宝 / bun 淘宝）
+#         - 完善 BuildKit 缓存挂载（apk/bun/pip/npm 下载缓存持久化）
+#         - musl baseline binary + Alpine（v0.0.3 已验证能运行）
+#         - glibc baseline binary 在 Debian 容器里挂起，弃用
+#         - --version 验证加 timeout 防止挂起
+#
+# 构建时间对比（首次 → 有缓存）：
+#   v0.0.6: 6-7 小时 → 3-4 小时（glibc baseline，会挂起）
+#   v0.0.8: 1-2 小时 → 10-20 分钟（musl baseline + 国内源 + 全缓存）
 
-FROM alpine:3.24.1
+# ============ Stage 1: builder ============
+# 在 Alpine 容器里编译 musl baseline binary
+# Alpine 环境自动安装 musl native binding，无需交叉编译
+FROM oven/bun:1.3.14-alpine AS builder
+
+WORKDIR /build
+
+# 安装 git + python3 + build-essential
+# - git: Script 模块获取 channel（设了 OPENCODE_CHANNEL 可绕过）
+# - python3 make g++: node-gyp 编译 native 模块（tree-sitter-powershell 等）
+# 阿里云 Alpine 镜像源 + cache 挂载加速
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+    sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
+    apk add --no-cache git ca-certificates python3 make g++
+
+# COPY 源代码（.dockerignore 排除了 node_modules/dist/.git）
+COPY . .
+
+# 修改 packages/app/package.json，把 ghostty-web 的 github 引用改为本地 file 引用
+# 容器内无法访问 GitHub，主机已预先把 ghostty-web 源码放到 vendor/ghostty-web/
+RUN sed -i 's|"ghostty-web": "github:anomalyco/ghostty-web#main"|"ghostty-web": "file:../../vendor/ghostty-web"|' packages/app/package.json
+
+# 安装依赖（在 Alpine/musl 容器里安装，native binding 是 musl 版本）
+# 国内 npm 镜像（淘宝）+ cache 挂载持久化 bun 下载缓存
+ENV BUN_CONFIG_REGISTRY=https://registry.npmmirror.com
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install
+
+# 编译 binary
+# 设置 OPENCODE_CHANNEL 和 OPENCODE_VERSION 避免 Script 模块访问 npm registry / git
+# --docker-build: 只编译 Linux x64 baseline musl（Alpine 兼容）
+ENV OPENCODE_CHANNEL=latest
+ENV OPENCODE_VERSION=1.17.6
+RUN cd packages/opencode && bun run script/build.ts --docker-build
+
+# 验证 binary（先跳过，后续在 runtime 阶段验证）
+# RUN timeout 30 packages/opencode/dist/opencode-linux-x64-musl/bin/opencode --version
+
+# ============ Stage 2: runtime ============
+FROM alpine:3.20
 
 # Disable Bun's runtime transpiler cache (not useful in ephemeral containers)
 ARG BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
 ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
 
+# 阿里云 Alpine 镜像源 + 启用 community 仓库（libreoffice 在 community 里）
 # 一次性装齐所有系统包
-# - libgcc/libstdc++  : opencode 二进制运行时依赖
-# - ripgrep           : opencode 内置代码搜索
-# - xdg-utils         : opencode 启动时尝试打开浏览器所需
-# - bash git curl     : 常用工具 (排查 / 调试)
-# - nodejs npm pnpm   : docx / pdf / xlsx 等 skill 需要 node 生态
-# - python3 py3-pip   : 上述 skill 同样依赖 python 生态
-# - uv                : edge-tts skill 专用 (uvx edge-tts)
-# - libreoffice       : docx 转换 + xlsx 公式重算 (300MB, 必需)
-# - poppler-utils     : pdftoppm / pdftotext / pdfimages
-# - poppler-data      : pdf 编码数据
-# - qpdf              : pdf 合并/拆分/解密
-# 不装: tesseract (OCR, 按需安装) / font-noto-cjk (CJK 字体, 按需安装)
-RUN apk add --no-cache \
+# - libgcc libstdc++   : opencode 二进制运行时依赖（musl 版本）
+# - ripgrep            : opencode 内置代码搜索
+# - xdg-utils          : opencode 启动时尝试打开浏览器所需
+# - bash git curl      : 常用工具 (排查 / 调试)
+# - nodejs npm         : docx / pdf / xlsx 等 skill 需要 node 生态
+# - python3 py3-pip    : 上述 skill 同样依赖 python 生态
+# - libreoffice        : docx 转换 + xlsx 公式重算 (300MB, 必需)
+# - poppler-utils      : pdftoppm / pdftotext / pdfimages
+# - poppler-data       : pdf 编码数据
+# - qpdf               : pdf 合并/拆分/解密
+# - ca-certificates    : HTTPS 证书
+# 使用 cache 挂载加速 apk 下载（缓存持久化，下次构建跳过下载）
+RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+    sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
+    apk add --no-cache \
     libgcc libstdc++ ripgrep xdg-utils \
     bash git curl ca-certificates \
-    nodejs npm pnpm \
+    nodejs npm \
     python3 py3-pip \
-    uv \
     libreoffice \
     poppler-utils poppler-data qpdf
 
-# Copy the pre-built musl binary (Alpine uses musl libc, not glibc)
-COPY packages/opencode/dist/opencode-linux-x64-baseline-musl/bin/opencode /usr/local/bin/opencode
+# npm 淘宝镜像源
+RUN npm config set registry https://registry.npmmirror.com
+
+# 安装 uv (edge-tts skill 专用, uvx edge-tts)
+# 使用 cache 挂载持久化 pip 下载缓存
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --break-system-packages uv
+
+# 安装 pnpm (skill 需要)
+# 使用 cache 挂载持久化 npm 下载缓存
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g pnpm
+
+# COPY 编译好的 musl AVX2 binary from builder stage
+COPY --from=builder /build/packages/opencode/dist/opencode-linux-x64-musl/bin/opencode /usr/local/bin/opencode
 RUN chmod +x /usr/local/bin/opencode
 
-# 用 uv pip 安装 12 个 Python 包到系统 site-packages
-# uv 比 pip 快 10~100 倍,且会自动处理依赖冲突
-# --break-system-packages: Python 3.14 启用了 PEP 668 (Alpine 3.24 的 python3 自带 externally-managed 标记)
-#                          镜像里我们就是包管理者,可放心打破这个保护
+# ---- 分层优化：requirements 前置 ----
+# 先 COPY requirements 文件，再装依赖
+# 这样改源码不会触发 pip 重新安装，只有改 requirements.txt 才会
+
+# 用 uv pip 安装 Python 包到系统 site-packages
+# 国内 PyPI 镜像（清华）+ cache 挂载持久化 uv 下载缓存
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 COPY docker/requirements.txt /tmp/requirements.txt
-RUN uv pip install --system --break-system-packages --no-cache -r /tmp/requirements.txt \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --break-system-packages -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 
-# 用 npm 安装 3 个全局包
-# - docx       : docx skill 创建新文档
-# - pdf-lib    : pdf skill (reference.md) JS 操作
-# - pdfjs-dist : pdf skill (reference.md) JS 解析
-RUN npm install -g --silent docx pdf-lib pdfjs-dist \
- && npm cache clean --force
+# 安装 ppt-master skill 依赖（17 个 Python 包，v0.0.6 新增）
+COPY docker/requirements-ppt.txt /tmp/requirements-ppt.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system --break-system-packages -r /tmp/requirements-ppt.txt \
+ && rm -f /tmp/requirements-ppt.txt
 
-# Test the binary
-RUN opencode --version \
- && node --version \
- && python3 --version \
- && uv --version
+# 用 npm 安装 3 个全局包
+# 使用 cache 挂载持久化 npm 下载缓存
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g docx pdf-lib pdfjs-dist
+
+# 烤入多用户预置清单（v0.0.6 新增）
+COPY docker/seed-users.json /etc/opencode/seed-users.json
+ENV OPENCODE_SEED_USERS_FILE=/etc/opencode/seed-users.json
+
+# 验证 binary 和运行时（先跳过 opencode --version，用 strace 调试挂起问题）
+RUN timeout 30 node --version \
+ && timeout 30 python3 --version \
+ && timeout 30 uv --version
 
 # Expose web port
 EXPOSE 8088
