@@ -90,7 +90,6 @@
     "@effect/sql-sqlite-bun": "catalog:",
     "@ff-labs/fff-bun": "0.9.4",
     "@lydell/node-pty": "catalog:",
-    "@node-rs/argon2": "2.0.2",
     "@npmcli/arborist": "9.4.0",
     "@npmcli/config": "10.8.1",
     "@opencode-ai/effect-drizzle-sqlite": "workspace:*",
