@@ -1,8 +1,8 @@
-import { hash } from "@node-rs/argon2"
 import { sql } from "drizzle-orm"
 import { Effect } from "effect"
 import type { DatabaseMigration } from "../migration"
 import { loadAllowedNames } from "../../user/allowed-names"
+import { hashPassword } from "../../user"
 
 /**
  * 种子迁移：从 allowed-names.txt 白名单批量创建初始用户
@@ -23,13 +23,7 @@ export default {
       if (names.length === 0) return
 
       const now = Date.now()
-      const passwordHash = yield* Effect.promise(() =>
-        hash(password, {
-          memoryCost: 19456,
-          timeCost: 2,
-          parallelism: 1,
-        }),
-      )
+      const passwordHash = yield* Effect.promise(() => hashPassword(password))
 
       for (const username of names) {
         const id = "usr_" + username
