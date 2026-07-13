@@ -12,7 +12,7 @@ import { readFile } from "node:fs/promises"
 /**
  * 启动引导：首次启动时创建 admin 账号
  * - 如果 user 表已有用户（含迁移脚本创建的 29 人），跳过
- * - 没有用户且没设 OPENCODE_SERVER_PASSWORD → fail-fast
+ * - 没有用户且没设 OPENCODE_SERVER_PASSWORD → 静默跳过，交给 bootstrapUsers() 从种子文件预置
  * - 没有用户且设了密码 → 创建 admin 账号
  */
 function bootstrapAdmin() {
@@ -23,8 +23,8 @@ function bootstrapAdmin() {
 
     const password = Flag.OPENCODE_SERVER_PASSWORD
     if (!password) {
-      console.error("首次启动必须设置 OPENCODE_SERVER_PASSWORD 环境变量")
-      process.exit(1)
+      console.log("[bootstrapAdmin] 跳过：未设置 OPENCODE_SERVER_PASSWORD，等待 bootstrapUsers 从种子文件预置")
+      return
     }
 
     const username = Flag.OPENCODE_SERVER_USERNAME ?? "admin"
@@ -94,7 +94,7 @@ export const ServeCommand = effectCmd({
     const { Server } = yield* Effect.promise(() => import("../../server/server"))
 
     if (!Flag.OPENCODE_SERVER_PASSWORD) {
-      console.log("Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.")
+      console.log("Info: OPENCODE_SERVER_PASSWORD 未设置，HTTP Basic Auth 已禁用，使用多用户登录系统（种子文件预置账号）")
     }
 
     // 启动引导：确保 admin 账号存在
