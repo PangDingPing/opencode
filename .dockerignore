@@ -10,3 +10,17 @@ node_modules
 **/.turbo
 **/.vite
 **/coverage
+
+# Docker 构建缓存目录（预下载的依赖，不需要 COPY 进容器）
+docker/pip-wheels
+docker/npm-cache
+
+# 日志和文档（不需要打进镜像）
+日志
+日志.md
+*.md
+!docker/readme.md
+!packages/**/README.md
+
+# 自定义改动文档
+自定义改动.md
