@@ -8,7 +8,6 @@ docker/api-keys.env
 .idea
 .vscode
 .codex
-.trae
 *~
 playground
 tmp
