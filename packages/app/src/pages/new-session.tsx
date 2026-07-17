@@ -114,7 +114,7 @@ export default function NewSessionPage() {
             class="relative min-w-0 h-full shrink-0 overflow-hidden bg-background-stronger rounded-[10px] border-l border-border-weaker-base"
             style={{ width: `${layout.fileTree.width()}px` }}
           >
-            <div class="h-full flex flex-col overflow-hidden">
+            <div class="h-full flex flex-col overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
               <FileTree path="" class="pt-3" onFileClick={() => {}} />
             </div>
             <ResizeHandle
