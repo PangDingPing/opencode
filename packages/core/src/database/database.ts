@@ -1,3 +1,7 @@
+// 自引用命名空间导出必须放在文件最顶部，避免模块体执行时 Database binding 处于 TDZ
+// （binary 编译模式与源码直跑模式都兼容，与上游 dev 分支 database.ts 一致）
+export * as Database from "./database"
+
 import { EffectDrizzleSqlite } from "@opencode-ai/effect-drizzle-sqlite"
 import { layer as sqliteLayer } from "#sqlite"
 import { Context, Effect, Layer } from "effect"
@@ -59,10 +63,3 @@ export const defaultLayer = Layer.unwrap(
 ).pipe(Layer.provide(Global.defaultLayer))
 
 export const node = LayerNode.make(layerFromPath(path()), [])
-
-// 自引用命名空间导出：Bun compile 后 `export const Database = {...}` 会因模块
-// lazy loading 顺序问题导致 `Database` 在被引用时仍是 undefined（xd.node 报错）。
-// 自引用 `export * as Database from "./database"` 创建 live binding namespace，
-// namespace 对象本身始终存在，属性在模块体执行后填充，避免 undefined 错误。
-// 与 global.ts 的 `export * as Global from "./global"` 模式一致。
-export * as Database from "./database"
