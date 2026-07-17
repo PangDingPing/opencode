@@ -1,3 +1,7 @@
+// 自引用命名空间导出必须放在文件最顶部，避免模块体执行时 AuthToken binding 处于 TDZ
+// （binary 编译模式与源码直跑模式都兼容，与上游 dev 分支 database.ts 模式一致）
+export * as AuthToken from "./index"
+
 import { and, eq, gt, isNull } from "drizzle-orm"
 import { Context, Effect, Layer } from "effect"
 import { Database } from "../database/database"
@@ -130,6 +134,3 @@ export const defaultLayer = Layer.succeed(
 )
 
 export const node = LayerNode.make(defaultLayer, [Database.node])
-
-// 自引用命名空间导出：避免 Bun compile 后 `export const AuthToken = {...}` 的 lazy loading undefined 问题
-export * as AuthToken from "./index"
