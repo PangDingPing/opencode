@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm"
 import { Effect } from "effect"
 import type { DatabaseMigration } from "../migration"
 import { loadAllowedNames } from "../../user/allowed-names"
-import { hashPassword } from "../../user"
+import { hashPassword } from "../../user/password"
 
 /**
  * 种子迁移：从 allowed-names.txt 白名单批量创建初始用户
