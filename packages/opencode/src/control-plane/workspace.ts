@@ -38,6 +38,8 @@ import { Vcs } from "@/project/vcs"
 import { InstanceStore } from "@/project/instance-store"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { WorkspaceAdapterRuntime } from "./workspace-adapter-runtime"
+// yejian: 注入实名用户上下文到 system prompt 时用到
+import { User } from "@opencode-ai/core/user"
 
 export const Info = Schema.Struct({
   ...WorkspaceInfoSchema.fields,
@@ -983,6 +985,8 @@ export const node = LayerNode.make(layer, [
   Auth.node,
   Session.node,
   SessionPrompt.node,
+  // yejian: User 服务（注入实名用户上下文到 system prompt 时用到）
+  User.node,
   httpClient,
   EventV2Bridge.node,
   Vcs.node,
