@@ -7,7 +7,7 @@
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
 - **宿主机端口**：80（v0.0.6 起；之前版本为 8088）
-- **镜像名称**：`yejian-opencode:v0.0.8`
+- **镜像名称**：`yejian-opencode:v0.0.9`
 - **容器名称**：`yejian-AIworkbench`
 - **基础镜像**：`oven/bun:1.3.14-alpine`（builder 阶段）+ `alpine:3.20`（runtime 阶段；v0.0.8 回到 3.20，3.24 装 libreoffice 拉链子慢）
 - **构建策略**：多阶段构建 —— builder 阶段在 Alpine/musl 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary，runtime 阶段只 COPY binary + 装运行时依赖（libreoffice / poppler / uv / pnpm 等）
