@@ -51,6 +51,8 @@ import { memoMap } from "@opencode-ai/core/effect/memo-map"
 import { BackgroundJob } from "@/background/job"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
+// yejian: 注入实名用户上下文到 system prompt 时用到
+import { User } from "@opencode-ai/core/user"
 
 export const AppLayer = Layer.mergeAll(
   Npm.defaultLayer,
@@ -99,6 +101,8 @@ export const AppLayer = Layer.mergeAll(
   Installation.defaultLayer,
   ShareNext.defaultLayer,
   SessionShare.defaultLayer,
+  // yejian: 用户服务（注入实名用户上下文到 system prompt 时用到）
+  User.defaultLayer,
 ).pipe(
   Layer.provideMerge(Ripgrep.defaultLayer),
   Layer.provideMerge(InstanceLayer.layer),
