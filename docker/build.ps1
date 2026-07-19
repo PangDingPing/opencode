@@ -15,7 +15,7 @@
 param(
     [string]$ImageName = "yejian-opencode",
     [string]$ContainerName = "yejian-AIworkbench",
-    [string]$ImageTag = "v0.0.8",
+    [string]$ImageTag = "v0.0.9",
     [int]$HostPort = 80,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
