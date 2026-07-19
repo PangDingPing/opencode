@@ -63,7 +63,6 @@ import { useTheme, type ColorScheme } from "@opencode-ai/ui/theme/context"
 import { useCommand, type CommandOption } from "@/context/command"
 import { ConstrainDragXAxis, getDraggableId } from "@/utils/solid-dnd"
 import { DebugBar } from "@/components/debug-bar"
-import { HelpButton } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { useDirectoryPicker } from "@/components/directory-picker"
 import { ServerConnection, useServer } from "@/context/server"
@@ -2364,7 +2363,6 @@ export default function Layout(props: ParentProps) {
             </Show>
           </main>
           {import.meta.env.DEV && <DebugBar />}
-          <HelpButton />
           <ToastRegion v2={newDesign()} />
         </div>
       }
@@ -2518,7 +2516,6 @@ export default function Layout(props: ParentProps) {
           </div>
           {import.meta.env.DEV && <DebugBar />}
         </div>
-        <HelpButton />
         <ToastRegion v2={newDesign()} />
       </div>
     </Show>
