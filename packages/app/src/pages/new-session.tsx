@@ -5,8 +5,10 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import FileTree from "@/components/file-tree"
 import { NewSessionDesignView } from "@/components/session"
+import { useCommand } from "@/context/command"
 import { useComments } from "@/context/comments"
 import { useFile } from "@/context/file"
+import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
@@ -28,6 +30,8 @@ export default function NewSessionPage() {
   const file = useFile()
   const layout = useLayout()
   const settings = useSettings()
+  const command = useCommand()
+  const language = useLanguage()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
 
   let inputRef: HTMLDivElement | undefined
@@ -60,6 +64,20 @@ export default function NewSessionPage() {
   })
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
+
+  // 自定义：注册 Ctrl+\ 快捷键切换文件树（参考 use-session-commands.tsx 的 fileTree.toggle）
+  command.register("new-session", () => {
+    if (!settings.visibility.fileTree()) return []
+    return [
+      {
+        id: "fileTree.toggle",
+        title: language.t("command.fileTree.toggle"),
+        category: language.t("command.category.view"),
+        keybind: "mod+\\",
+        onSelect: () => layout.fileTree.toggle(),
+      },
+    ]
+  })
 
   // 文件树是否显示：桌面端 + 用户偏好 + 已展开
   const fileTreeOpen = createMemo(
