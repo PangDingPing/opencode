@@ -64,6 +64,9 @@ import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
+// yejian: 用户实名上下文注入（详见 ./user-context.ts）
+import { User } from "@opencode-ai/core/user"
+import { formatUserContext } from "./user-context"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -129,6 +132,8 @@ export const layer = Layer.effect(
     const flags = yield* RuntimeFlags.Service
     const database = yield* DatabaseService
     const { db } = database
+    // yejian: 用于按 session.user_id 查当前登录用户，拼进 system prompt
+    const userService = yield* User.Service
     const ops = Effect.fn("SessionPrompt.ops")(function* () {
       return {
         cancel: (sessionID: SessionID) => cancel(sessionID),
@@ -1335,6 +1340,13 @@ export const layer = Layer.effect(
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
             const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+            // yejian: 注入当前登录用户（实名）到系统提示词，大模型无需用户输入即可知道用户身份
+            // 字段名是 user_id（snake_case），见 packages/opencode/src/session/session.ts 的 Schema.Info 定义
+            // 详见 packages/opencode/src/session/user-context.ts
+            if (session.user_id) {
+              const currentUser = yield* userService.getUser(session.user_id).pipe(Effect.orDie)
+              system.push(formatUserContext(currentUser))
+            }
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1586,6 +1598,8 @@ export const defaultLayer = Layer.suspend(() =>
         CrossSpawnSpawner.defaultLayer,
         RuntimeFlags.defaultLayer,
         EventV2Bridge.defaultLayer,
+        // yejian: 用户服务（注入实名用户上下文到 system prompt 时用到）
+        User.defaultLayer,
       ),
     ),
   ),
@@ -1721,6 +1735,8 @@ export const node = LayerNode.make(layer, [
   EventV2Bridge.node,
   RuntimeFlags.node,
   DatabaseNode,
+  // yejian: User 服务（注入实名用户上下文到 system prompt 时用到）
+  User.node,
 ])
 
 export * as SessionPrompt from "./prompt"
