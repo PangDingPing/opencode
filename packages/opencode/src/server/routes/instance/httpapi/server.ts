@@ -239,6 +239,8 @@ const app = LayerNode.group([
   SessionRevert.node,
   SessionSummary.node,
   SessionPrompt.node,
+  // yejian: User 服务（注入实名用户上下文到 system prompt 时用到）
+  User.node,
   Instruction.node,
   LLM.node,
   LSP.node,
