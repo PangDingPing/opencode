@@ -52,7 +52,7 @@ export interface Settings {
 export const monoDefault = "System Mono"
 export const sansDefault = "System Sans"
 export const terminalDefault = "JetBrainsMono Nerd Font Mono"
-export const newLayoutDesignsDefault = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
+export const newLayoutDesignsDefault = true
 
 const monoFallback =
   'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
@@ -118,6 +118,7 @@ const defaultSettings: Settings = {
     editToolPartsExpanded: false,
     showSessionProgressBar: true,
     showCustomAgents: true,
+    newLayoutDesigns: true,
   },
   appearance: {
     fontSize: 14,
@@ -132,7 +133,7 @@ const defaultSettings: Settings = {
   notifications: {
     agent: true,
     permissions: true,
-    errors: false,
+    errors: true,
   },
   sounds: {
     agentEnabled: true,
