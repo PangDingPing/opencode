@@ -25,7 +25,7 @@ WORKDIR /build
 # 阿里云 Alpine 镜像源 + cache 挂载加速
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --no-cache git ca-certificates python3 make g++
+    apk add --update --cache-dir /var/cache/apk git ca-certificates python3 make g++
 
 # COPY 源代码（.dockerignore 排除了 node_modules/dist/.git）
 COPY . .
@@ -73,7 +73,7 @@ ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
 # 使用 cache 挂载加速 apk 下载（缓存持久化，下次构建跳过下载）
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --no-cache \
+    apk add --update --cache-dir /var/cache/apk \
     libgcc libstdc++ ripgrep xdg-utils \
     bash git curl ca-certificates \
     nodejs npm \
