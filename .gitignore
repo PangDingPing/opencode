@@ -42,3 +42,7 @@ serve-stdout.log
 serve-stderr.log
 smoke-err.txt
 smoke-out.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
