@@ -16,7 +16,7 @@ param(
     [string]$ImageName = "yejian-opencode",
     [string]$ContainerName = "yejian-AIworkbench",
     [string]$ImageTag = "v0.0.9",
-    [int]$HostPort = 80,
+    [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
     [switch]$ForceRebuild = $false   # Pass --no-cache to docker build (force full rebuild)
