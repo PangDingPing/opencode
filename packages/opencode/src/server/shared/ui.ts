@@ -12,6 +12,11 @@ export const csp = (hash = "") =>
   `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src * data:`
 export const DEFAULT_CSP = csp()
 
+// 自定义：/yejian/ 下的静态 HTML 页面（现行规范 / 图集等）包含内联搜索脚本，
+// 需要允许 script-src 'unsafe-inline'，否则浏览器会阻止脚本执行。
+export const YEJIAN_CSP =
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src * data:"
+
 export function themePreloadHash(body: string) {
   return body.match(/<script\b(?![^>]*\bsrc\s*=)[^>]*\bid=(['"])oc-theme-preload-script\1[^>]*>([\s\S]*?)<\/script>/i)
 }
@@ -52,11 +57,16 @@ function notFound() {
   return HttpServerResponse.jsonUnsafe({ error: "Not Found" }, { status: 404 })
 }
 
-function embeddedUIResponse(file: string, body: Uint8Array) {
+function embeddedUIResponse(file: string, body: Uint8Array, requestPath: string) {
   const mime = FSUtil.mimeType(file)
   const headers = new Headers({ "content-type": mime })
   if (mime.startsWith("text/html")) {
-    headers.set("content-security-policy", cspForHtml(new TextDecoder().decode(body)))
+    // 自定义：/yejian/ 下的静态页面使用允许内联脚本的 CSP
+    const isYejianStatic = requestPath.replace(/^\//, "").startsWith("yejian/")
+    headers.set(
+      "content-security-policy",
+      isYejianStatic ? YEJIAN_CSP : cspForHtml(new TextDecoder().decode(body)),
+    )
   }
   return HttpServerResponse.raw(body, { headers })
 }
@@ -70,7 +80,7 @@ export function serveEmbeddedUIEffect(
   if (!file) return Effect.succeed(notFound())
 
   return fs.readFile(file).pipe(
-    Effect.map((body) => embeddedUIResponse(file, body)),
+    Effect.map((body) => embeddedUIResponse(file, body, requestPath)),
     Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(notFound())),
   )
 }
