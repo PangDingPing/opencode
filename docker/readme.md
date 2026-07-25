@@ -1077,7 +1077,7 @@ docker run -d --name yejian-AIworkbench -p 8088:8088 `
 
 | 参数 | build.ps1 / run.ps1 默认 | 用户实际 | 原因 |
 |---|---|---|---|
-| `-p` | `127.0.0.1:8088:8080`（build.ps1）<br>`${HostPort}:${ContainerPort}`（run.ps1） | `8088:8088`（0.0.0.0） | 用户希望局域网能访问（绑定所有网卡） |
+| `-p` | `8088:8088`（build.ps1 / run.ps1 默认） | `8088:8088`（0.0.0.0） | 一致 |
 | `-v` 工作目录 | `D:\AI\AIworkbench:/workspace` | `E:\AI\YEJIAN:/YEJIAN` | 用户在 YEJIAN 项目下用 opencode，需要挂载 YEJIAN |
 | `-v` `/root` | `D:\AI\AIworkbench-data/root:/root` | `E:\AI\AIworkbench-data/root:/root` | 容器 root 数据放 AIworkbench-data |
 | `-v` `/tmp` | `D:\AI\AIworkbench-data/tmp:/tmp` | `E:\AI\AIworkbench-data/tmp:/tmp` | 一致 |
@@ -1172,7 +1172,7 @@ if (list.length === 0) {
 ### 四、启动命令（用户最终使用）
 
 ```powershell
-docker run -d --name yejian-AIworkbench -p 80:8088 `
+docker run -d --name yejian-AIworkbench -p 8088:8088 `
   -v "E:\AI\YEJIAN:/YEJIAN" `
   -v "E:\AI\AIworkbench-data/root:/root" `
   -v "E:\AI\AIworkbench-data/tmp:/tmp" `
@@ -1184,7 +1184,7 @@ docker run -d --name yejian-AIworkbench -p 80:8088 `
 ```
 
 **与 v0.0.5 的差异**：
-- 端口映射 `8088:8088` → `80:8088`（直接用 80 端口访问）
+- 端口映射保持 `8088:8088`
 - 镜像 tag `v0.0.5` → `v0.0.6`
 - api-keys.env 内容不变（只有 AGNES_API_KEY 和 MinerU-api）
 
@@ -1218,7 +1218,7 @@ python3 -c "import pptx, edge_tts, svglib, reportlab, fitz, mammoth, markdownify
 
 #### 5.3 浏览器验证
 
-1. 访问 `http://localhost`（80 端口）
+1. 访问 `http://localhost:8088`（8088 端口）
 2. 登录页输入 `yejian` / `Yejian2016`
 3. 首次登录强制改密
 4. 改密后自动跳转，默认打开 `/YEJIAN` 项目
@@ -1313,7 +1313,7 @@ docker build --no-cache-filter=builder -t yejian-opencode:v0.0.8 -f docker/Docke
 
 启动命令（与 v0.0.6 相同）：
 ```powershell
-docker run -d --name yejian-AIworkbench -p 80:8088 `
+docker run -d --name yejian-AIworkbench -p 8088:8088 `
   -v "E:\AI\YEJIAN:/YEJIAN" `
   -v "E:\AI\AIworkbench-data\root:/root" `
   -v "E:\AI\AIworkbench-data\tmp:/tmp" `
@@ -1363,7 +1363,7 @@ docker run --rm yejian-opencode:v0.0.8 opencode --version
 docker run --rm -v "E:\AI\AIworkbench-data:/data" alpine:3.20 sh -c "rm -rf /data/* /data/.*; mkdir -p /data/root /data/tmp"
 
 # 启动容器
-docker run -d --name yejian-AIworkbench -p 80:8088 -v "E:\AI\YEJIAN:/YEJIAN" -v "E:\AI\AIworkbench-data\root:/root" -v "E:\AI\AIworkbench-data\tmp:/tmp" -w /YEJIAN --hostname 0.0.0.0 --env-file "E:\AI\dockerimage\api-keys.env" --restart always yejian-opencode:v0.0.8
+docker run -d --name yejian-AIworkbench -p 8088:8088 -v "E:\AI\YEJIAN:/YEJIAN" -v "E:\AI\AIworkbench-data\root:/root" -v "E:\AI\AIworkbench-data\tmp:/tmp" -w /YEJIAN --hostname 0.0.0.0 --env-file "E:\AI\dockerimage\api-keys.env" --restart always yejian-opencode:v0.0.8
 
 # 等待 10 秒后插入用户（bootstrapUsers 在 binary 模式下不工作，需要手动插入）
 docker stop yejian-AIworkbench
@@ -1373,13 +1373,13 @@ docker run --rm -v "E:\AI\AIworkbench-data:/data" -v "d:\AI\opencode\docker\inse
 docker start yejian-AIworkbench
 Start-Sleep -Seconds 8
 $body = '{"username":"yejian","password":"Yejian2016"}'
-Invoke-WebRequest -Uri "http://localhost:80/api/auth/login" -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
+Invoke-WebRequest -Uri "http://localhost:8088/api/auth/login" -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
 # 应返回 200 + {"user":{"id":"usr_yejian","username":"yejian","role":"admin",...}}
 ```
 
 #### 4.4 浏览器验证
 
-访问 `http://localhost` → 自动跳 `/login` → 输入 `yejian` / `Yejian2016` → 登录成功 → 默认打开 `/YEJIAN` 项目
+访问 `http://localhost:8088` → 自动跳 `/login` → 输入 `yejian` / `Yejian2016` → 登录成功 → 默认打开 `/YEJIAN` 项目
 
 ### 五、踩坑记录（5 个新增）
 
