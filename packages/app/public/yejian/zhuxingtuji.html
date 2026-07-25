@@ -7,34 +7,57 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
         }
         .sheet-section {
-            margin-bottom: 40px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
             background: white;
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .sheet-section:last-child {
+            margin-bottom: 0;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            margin-bottom: 10px;
+            gap: 20px;
         }
         .sheet-section h2 {
             color: #4CAF50;
-            margin-top: 0;
+            margin: 0;
+            font-size: 20px;
         }
         .search-box {
-            margin-bottom: 15px;
+            margin: 0;
+            flex: 1;
+            max-width: 400px;
         }
         .search-box input {
             width: 100%;
-            padding: 10px;
+            padding: 8px 10px;
             font-size: 14px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
+        }
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
         }
         table {
             width: 100%;
@@ -64,23 +87,23 @@
     </style>
 </head>
 <body>
-    <h1>最新图集数据20260206</h1>
-
-    
         <div class="sheet-section">
-            <h2>现行图集目录 (共 1014 条)</h2>
-            <div class="search-box">
-                <input type="text" id="search_现行图集目录" placeholder="搜索..." onkeyup="filterTable('table_现行图集目录', 'search_现行图集目录')">
+            <div class="section-header">
+                <h2>现行图集目录 (共 1014 条)</h2>
+                <div class="search-box">
+                     <input type="text" id="search_现行图集目录" placeholder="搜索...">
+                </div>
             </div>
+            <div class="table-container">
             <table border="1" class="dataframe" id="table_现行图集目录">
   <thead>
     <tr style="text-align: right;">
-      <th>图集状态</th>
-      <th>专业</th>
-      <th>分类</th>
-      <th>图集号</th>
-      <th>图集名称</th>
-      <th>被替代图集或备注</th>
+      <th style="width: 6%;">图集状态</th>
+      <th style="width: 12%;">专业</th>
+      <th style="width: 15%;">分类</th>
+      <th style="width: 13%;">图集号</th>
+      <th style="width: 32%;">图集名称</th>
+      <th style="width: 22%;">被替代图集或备注</th>
     </tr>
   </thead>
   <tbody>
@@ -8198,21 +8221,25 @@
     </tr>
   </tbody>
 </table>
+            </div>
         </div>
         
         <div class="sheet-section">
-            <h2>废止图集目录 (共 1306 条)</h2>
-            <div class="search-box">
-                <input type="text" id="search_废止图集目录" placeholder="搜索..." onkeyup="filterTable('table_废止图集目录', 'search_废止图集目录')">
+            <div class="section-header">
+                <h2>废止图集目录 (共 1306 条)</h2>
+                <div class="search-box">
+                     <input type="text" id="search_废止图集目录" placeholder="搜索...">
+                </div>
             </div>
+            <div class="table-container">
             <table border="1" class="dataframe" id="table_废止图集目录">
   <thead>
     <tr style="text-align: right;">
-      <th>图集状态</th>
-      <th>专业</th>
-      <th>图集号</th>
-      <th>图集名称</th>
-      <th>新图集或备注</th>
+      <th style="width: 6%;">图集状态</th>
+      <th style="width: 12%;">专业</th>
+      <th style="width: 15%;">图集号</th>
+      <th style="width: 40%;">图集名称</th>
+      <th style="width: 27%;">新图集或备注</th>
     </tr>
   </thead>
   <tbody>
@@ -17360,6 +17387,7 @@
     </tr>
   </tbody>
 </table>
+            </div>
         </div>
         
 
@@ -17389,6 +17417,21 @@
                 }
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var searchInputs = [
+                { inputId: 'search_现行图集目录', tableId: 'table_现行图集目录' },
+                { inputId: 'search_废止图集目录', tableId: 'table_废止图集目录' }
+            ];
+            searchInputs.forEach(function(item) {
+                var input = document.getElementById(item.inputId);
+                if (input) {
+                    input.addEventListener('keyup', function() {
+                        filterTable(item.tableId, item.inputId);
+                    });
+                }
+            });
+        });
     </script>
 </body>
 </html>
