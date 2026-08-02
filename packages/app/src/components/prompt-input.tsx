@@ -1851,7 +1851,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                   as="div"
                                   variant="ghost"
                                   size="normal"
-                                  class="min-w-0 max-w-[320px] text-13-regular text-text-base group"
+                                  class="min-w-0 max-w-[550px] text-13-regular text-text-base group"
                                   style={control()}
                                   onClick={() => {
                                     void import("@/components/dialog-select-model-unpaid").then((x) => {
@@ -1887,7 +1887,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                   variant: "ghost",
                                   size: "normal",
                                   style: control(),
-                                  class: "min-w-0 max-w-[320px] text-13-regular text-text-base group",
+                                  class: "min-w-0 max-w-[550px] text-13-regular text-text-base group",
                                   "data-action": "prompt-model",
                                 }}
                                 onClose={restoreFocus}
@@ -2121,7 +2121,7 @@ function ComposerModelControl(props: { state: ComposerModelControlState }) {
               as="div"
               variant="ghost"
               size="normal"
-              class="min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group"
+              class="min-w-0 max-w-[550px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group"
               style={props.state.style}
               onClick={props.state.onUnpaidClick}
             >
@@ -2149,7 +2149,7 @@ function ComposerModelControl(props: { state: ComposerModelControlState }) {
               size: "normal",
               style: props.state.style,
               class:
-                "min-w-0 max-w-[220px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group",
+                "min-w-0 max-w-[550px] justify-start text-[13px] font-[440] leading-5 text-v2-text-text-faint group",
               "data-action": "prompt-model",
             }}
             onClose={props.state.onClose}
