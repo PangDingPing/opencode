@@ -15,11 +15,12 @@
 param(
     [string]$ImageName = "yejian-opencode",
     [string]$ContainerName = "yejian-AIworkbench",
-    [string]$ImageTag = "v0.0.9",
+    [string]$ImageTag = "v0.1.3",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
-    [switch]$ForceRebuild = $false   # Pass --no-cache to docker build (force full rebuild)
+    [switch]$ForceRebuild = $false,   # Pass --no-cache to docker build (force full rebuild)
+    [switch]$RebuildBuilder = $false  # Pass --no-cache-filter=builder (rebuild builder stage only, runtime uses cache)
 )
 
 # Get script directory
@@ -32,6 +33,8 @@ Write-Host "Container Name: $ContainerName" -ForegroundColor Yellow
 Write-Host "Port Mapping: ${HostPort}:${ContainerPort}" -ForegroundColor Yellow
 if ($ForceRebuild) {
     Write-Host "Force Rebuild: --no-cache (full rebuild, slow)" -ForegroundColor Yellow
+} elseif ($RebuildBuilder) {
+    Write-Host "Rebuild Builder Only: --no-cache-filter=builder (runtime uses cache)" -ForegroundColor Yellow
 }
 Write-Host ""
 
@@ -52,11 +55,14 @@ try {
     # .dockerignore 保留（排除 node_modules/dist/.git），builder 阶段会在容器里重新 bun install
     # binary 在 builder 阶段编译，runtime 阶段只用 binary
     # v0.0.8: 国内镜像源 + BuildKit 缓存挂载，首次 1-2 小时，有缓存 10-20 分钟
+    # v0.1.3: 增加 -RebuildBuilder 模式（--no-cache-filter=builder），改源码后只重建 builder，runtime 用缓存
     Write-Host "[2/3] Building Docker image (multi-stage: builder + runtime)..." -ForegroundColor Green
     Write-Host "  builder stage: bun install + compile binary (首次 ~30 min, 有缓存 ~5 min)" -ForegroundColor Gray
     Write-Host "  runtime stage: apt + pip + npm (首次 ~60 min, 有缓存 ~10 min)" -ForegroundColor Gray
     if ($ForceRebuild) {
         docker build --network=host --no-cache -t "${ImageName}:${ImageTag}" -f "$ScriptDir/Dockerfile" .
+    } elseif ($RebuildBuilder) {
+        docker build --network=host --no-cache-filter=builder -t "${ImageName}:${ImageTag}" -f "$ScriptDir/Dockerfile" .
     } else {
         docker build --network=host -t "${ImageName}:${ImageTag}" -f "$ScriptDir/Dockerfile" .
     }

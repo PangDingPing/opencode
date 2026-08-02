@@ -42,9 +42,12 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 # 编译 binary
 # 设置 OPENCODE_CHANNEL 和 OPENCODE_VERSION 避免 Script 模块访问 npm registry / git
+# 设置 MODELS_DEV_API_JSON 避免 build.ts 联网下载 models.dev/api.json（国内无法访问）
+#   - docker/models-dev-api.json 是预先缓存的 models.dev 快照，COPY . . 时已复制到 /build/docker/
 # --docker-build: 只编译 Linux x64 baseline musl（Alpine 兼容）
 ENV OPENCODE_CHANNEL=latest
 ENV OPENCODE_VERSION=1.17.6
+ENV MODELS_DEV_API_JSON=/build/docker/models-dev-api.json
 RUN cd packages/opencode && bun run script/build.ts --docker-build
 
 # 验证 binary（先跳过，后续在 runtime 阶段验证）
