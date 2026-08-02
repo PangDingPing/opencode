@@ -477,6 +477,20 @@
             "搜索最新版《建筑节能与可再生能源利用通用规范》的执行情况"
           ],
           "prompt": "请使用 web-research 技能，对以下主题进行结构化网络调研，并将调研成果增量保存到用户文件夹下：\n\n"
+        },
+        {
+          "name": "提示词优化",
+          "developing": false,
+          "skillId": "prompt-optimization",
+          "tooltip": "撰写、优化或审查提示词 / system prompt / agent 指令 / few-shot / 角色人设 / harness 骨架的方法论。涉及「写提示词、改提示词、提示词不生效或不稳定、给 AI/大模型写指令、设计 agent 系统提示、写角色人格、调 few-shot 示例、让模型稳定输出某种格式或语气、防提示注入、prompt engineering」时触发，即使用户没有明说「提示词工程」。",
+          "keyword": "写提示词、改提示词、提示词优化、提示词不生效、给AI写指令、设计agent提示、角色人格、few-shot、prompt engineering、提示词工程",
+          "case": [
+            "帮我写一个让 AI 稳定输出 JSON 的提示词",
+            "我写的提示词效果不稳定，帮我优化一下",
+            "帮我设计一个建筑审查 agent 的系统提示",
+            "对以下提示词进行撰写/优化/审查。"
+          ],
+          "prompt": "请使用 prompt-optimization 技能，对以下提示词进行撰写/优化/审查：\n\n"
         }
       ]
     }
