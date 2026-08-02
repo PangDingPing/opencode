@@ -43,6 +43,57 @@ powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\open
 
 ---
 
+## 利用缓存构建（推荐，以后默认参照）
+
+**以后所有 Docker 构建都应优先利用 BuildKit 缓存，避免不必要的全量重建。** `build.ps1` 已内置三种构建模式：
+
+| 模式 | 命令 | 适用场景 | 耗时 |
+|------|------|----------|------|
+| 默认（全缓存） | `.\docker\build.ps1` | 源码未变，只换 tag 或重新打包 | ~1 分钟（runtime 全 CACHED） |
+| 只重建 builder | `.\docker\build.ps1 -RebuildBuilder` | **改了源码（最常用）** | ~1 分钟（builder ~30s + runtime 全 CACHED） |
+| 强制全量重建 | `.\docker\build.ps1 -ForceRebuild` | 改了 Dockerfile / 依赖 / 缓存损坏 | 1-2 小时 |
+
+### `-RebuildBuilder` 模式原理（推荐用于改源码后的重新打包）
+
+`-RebuildBuilder` 等价于 `docker build --no-cache-filter=builder`：
+
+- **builder 阶段**：忽略缓存重新编译 binary（约 30 秒），`bun install` / `npm` 下载缓存仍命中
+- **runtime 阶段**：完整复用旧缓存（apk / pip / npm / uv 全部 CACHED，0 秒）
+
+### v0.1.3 实测缓存利用情况
+
+以 v0.1.3 构建为例（删除旧 v0.1.3 镜像后重建）：
+
+| 阶段 | 状态 | 耗时 |
+|------|------|------|
+| builder 阶段编译 binary | 重新编译 | ~30 秒 |
+| builder 阶段 `bun install` / `npm` 下载 | 缓存命中 | 快速 |
+| runtime 阶段 apk / pip / npm / uv | **全部 CACHED** | 0 秒 |
+| **整体构建** | — | **约 1 分钟** |
+
+**结论**：`-RebuildBuilder` 模式（`--no-cache-filter=builder`）效果理想——只重建 builder 阶段拿到最新代码，runtime 阶段完整复用旧缓存，整体构建在 1 分钟内完成。
+
+### 关键缓存挂载（Dockerfile 内已配置）
+
+BuildKit 的 `--mount=type=cache` 是持久化下载缓存，**删除镜像不会丢失**这些缓存（缓存存在 Docker builder 的独立存储区，与镜像层分离）：
+
+| 挂载路径 | 作用 |
+|----------|------|
+| `/var/cache/apk` | Alpine apk 包下载缓存（libreoffice 300MB 等） |
+| `/root/.bun/install/cache` | Bun 依赖下载缓存 |
+| `/root/.cache/pip` | pip 下载缓存 |
+| `/root/.cache/uv` | uv 下载缓存 |
+| `/root/.npm` | npm 下载缓存 |
+
+### 何时该删旧镜像？
+
+重建同一 tag 的镜像时，**无需手动 `docker rmi`**——`docker build` 会自动用新镜像替换旧 tag。只有以下情况需要删镜像：
+
+- 旧镜像成为 `<none>` 悬空镜像占磁盘时，用 `docker image prune` 清理
+- 想彻底确认是从 builder 阶段重新构建（用 `-RebuildBuilder` 或 `-ForceRebuild` 即可，不必删镜像）
+
+---
+
 ## 完整构建流程
 
 ### 1. 准备工作
