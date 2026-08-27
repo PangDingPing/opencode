@@ -37,6 +37,7 @@ tsconfig.tsbuildinfo
 # Build / debug artifacts
 .bun-cache/
 vendor/
+docker/opencode-v013-binary
 docker/debug-strace*.sh
 serve-stdout.log
 serve-stderr.log
