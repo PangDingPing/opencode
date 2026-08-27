@@ -157,6 +157,16 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     }
 
     const defaultModel = () => {
+      // 自定义：优先使用 scnet（超算互联网）的第一个模型
+      const scnet = providers.connected().find((p) => p.id === "scnet")
+      if (scnet) {
+        const first = Object.values(scnet.models)[0]
+        if (first) {
+          const model = { providerID: scnet.id, modelID: first.id }
+          if (validModel(model)) return model
+        }
+      }
+
       const defaults = providers.default()
       for (const provider of providers.connected()) {
         const configured = defaults[provider.id]
