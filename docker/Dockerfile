@@ -106,8 +106,9 @@ RUN chmod +x /usr/local/bin/opencode
 # 这样改源码不会触发 pip 重新安装，只有改 requirements.txt 才会
 
 # 用 uv pip 安装 Python 包到系统 site-packages
-# 国内 PyPI 镜像（清华）+ cache 挂载持久化 uv 下载缓存
-ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+# 国内 PyPI 镜像（阿里云）+ cache 挂载持久化 uv 下载缓存
+# v0.1.4: 清华源对 uv/pip 客户端持续返回 403，改为阿里云源
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
 COPY docker/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --break-system-packages -r /tmp/requirements.txt \
