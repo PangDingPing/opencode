@@ -517,9 +517,9 @@ export function parts(messageID: MessageID) {
 
 export const get = Effect.fn("MessageV2.get")(function* (input: { sessionID: SessionID; messageID: MessageID }) {
   const { db } = yield* DatabaseService
-    return yield* db
-      .select()
-      .from(MessageTable)
+  const row = yield* db
+    .select()
+    .from(MessageTable)
     .where(and(eq(MessageTable.id, input.messageID), eq(MessageTable.session_id, input.sessionID)))
     .get()
     .pipe(Effect.orDie)
