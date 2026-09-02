@@ -60,6 +60,10 @@ FROM alpine:3.20
 ARG BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
 ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
 
+# yejian: 服务端时区固定为东八区（北京时间）。
+# 容器默认 UTC 会导致 system prompt 里的日期、日志与默认会话标题时间偏慢 8 小时
+ENV TZ=Asia/Shanghai
+
 # 阿里云 Alpine 镜像源 + 启用 community 仓库（libreoffice 在 community 里）
 # 一次性装齐所有系统包
 # - libgcc libstdc++   : opencode 二进制运行时依赖（musl 版本）
@@ -73,16 +77,17 @@ ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
 # - poppler-data       : pdf 编码数据
 # - qpdf               : pdf 合并/拆分/解密
 # - ca-certificates    : HTTPS 证书
+# - tzdata             : 时区数据（配合 TZ=Asia/Shanghai）
 # 使用 cache 挂载加速 apk 下载（缓存持久化，下次构建跳过下载）
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
-    apk add --update --cache-dir /var/cache/apk \
+    apk add --update --cache-dir=/var/cache/apk \
     libgcc libstdc++ ripgrep xdg-utils \
     bash git curl ca-certificates \
     nodejs npm \
     python3 py3-pip \
     libreoffice \
-    poppler-utils poppler-data qpdf
+    poppler-utils poppler-data qpdf tzdata
 
 # npm 淘宝镜像源
 RUN npm config set registry https://registry.npmmirror.com

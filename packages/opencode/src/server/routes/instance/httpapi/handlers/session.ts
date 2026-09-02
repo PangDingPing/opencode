@@ -87,8 +87,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const info = yield* SessionError.mapStorageNotFound(session.get(sessionID))
       // 非 admin 用户只能访问自己的 session
       const user = (yield* Effect.serviceOption(CurrentUser)) as Option.Option<{ id: string; role?: string }>
+      // yejian: user_id 为空（历史数据或非 HTTP 创建）时对普通用户一律拒绝（fail-closed），
+      // 防止无主会话对所有登录用户可见造成越权；存量空值已通过迁移补齐，新子会话由 task 工具继承父会话归属
       const denied =
-        Option.isSome(user) && user.value.role !== "admin" && info.user_id !== user.value.id
+        Option.isSome(user) &&
+        user.value.role !== "admin" &&
+        (!info.user_id || info.user_id !== user.value.id)
       if (denied) {
         return yield* SessionError.mapStorageNotFound(Effect.fail({ message: `Session not found: ${sessionID}` } as any))
       }

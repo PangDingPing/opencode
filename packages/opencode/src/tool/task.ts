@@ -139,10 +139,13 @@ export const TaskTool = Tool.define(
           action: "deny" as const,
         })) ?? []),
       ]
+      // yejian: 子 agent 会话继承父会话归属（user_id），
+      // 否则内部创建不经过 HTTP create 接口的补写逻辑，普通用户将无法访问子会话
       const nextSession =
         session ??
         (yield* sessions.create({
           parentID: ctx.sessionID,
+          userID: parent.user_id,
           title: params.description + ` (@${next.name} subagent)`,
           agent: next.name,
           permission: [
