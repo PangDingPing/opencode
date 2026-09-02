@@ -44,6 +44,10 @@ serve-stderr.log
 smoke-err.txt
 smoke-out.txt
 
+# yejian: 临时评估工作目录（含密钥的本地脚本，不入库）
+evaluation-timezone-subagent/
+.trae-html-share-packages/
+
 # Python cache
 __pycache__/
 *.py[cod]
