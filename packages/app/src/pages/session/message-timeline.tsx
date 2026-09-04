@@ -582,7 +582,7 @@ export function MessageTimeline(props: {
   const isMeasuredBottom = (root: HTMLDivElement) => root.scrollHeight - root.clientHeight - root.scrollTop <= 4
 
   const measureTimeline = () => {
-    virtualizer?.measure()
+    // yejian: virtua 0.49.1 的 VirtualizerHandle 无 measure 方法，原调用运行时会抛 TypeError 并中断底部锚定，移除
     anchorMeasuredBottom()
   }
 
