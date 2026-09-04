@@ -132,7 +132,10 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
             return yield* new InvalidRequestError({ message: "旧密码错误" })
           }
 
-          yield* userSvc.changePassword(user.id, newPassword)
+          // yejian: changePassword 失败为普通 Error，映射为 endpoint 声明的 InvalidRequestError（保留原始错误信息）
+          yield* userSvc.changePassword(user.id, newPassword).pipe(
+            Effect.mapError((e) => new InvalidRequestError({ message: e.message })),
+          )
 
           // 撤销其他 session（保留当前）
           const request = yield* HttpServerRequest.HttpServerRequest
@@ -158,7 +161,8 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
         Effect.gen(function* () {
           const user = yield* CurrentUser
           yield* userSvc.deleteUser(user.id)
-          return HttpApiSchema.NoContent
+          // endpoint 成功响应定义为 { ok: true }（原误返回 HttpApiSchema.NoContent schema 对象，运行时也不正确）
+          return { ok: true }
         }),
       )
   }),
