@@ -18,7 +18,7 @@ export type Role = "admin" | "user"
 export const UserTable = sqliteTable(
   "user",
   {
-    id: text().$type<ID>().primaryKey(),
+    id: text().primaryKey(),
     username: text().notNull().unique(),
     password_hash: text().notNull(),
     role: text().$type<Role>().notNull(),
