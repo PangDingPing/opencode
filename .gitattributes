@@ -1,2 +1,5 @@
+# yejian: 统一换行符为 LF，避免 Windows 下 CRLF/LF 混乱
+* text=auto eol=lf
+
 packages/core/migration/**/snapshot.json linguist-generated
 packages/core/src/database/migration.gen.ts linguist-generated
