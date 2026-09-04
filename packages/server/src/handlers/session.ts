@@ -1,4 +1,5 @@
 import { SessionV2 } from "@opencode-ai/core/session"
+import { UserID } from "@opencode-ai/core/user/sql"
 import { DateTime, Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
@@ -33,7 +34,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 )
               : ctx.query
           // 普通用户只能看自己的 session，admin 看全部
-          const userID = user.role === "admin" ? undefined : user.id
+          const userID = user.role === "admin" ? undefined : UserID.make(user.id)
           const sessions = yield* session.list({
             ...query,
             workspaceID: query.workspace,
@@ -84,7 +85,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
               agent: ctx.payload.agent,
               model: ctx.payload.model,
               location: ctx.payload.location ?? { directory },
-              userID: user.id,
+              userID: UserID.make(user.id),
             }),
           }
         }),
@@ -93,7 +94,9 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         "session.get",
         Effect.fn(function* (ctx) {
           const user = yield* CurrentUser
-          const session = yield* session.get(ctx.params.sessionID).pipe(
+          // yejian: 原 `const session = ...` 遮蔽外层 SessionV2.Service 且初始化时自引用（TDZ），
+          // 调用 session.get 接口会抛 ReferenceError，改名修复
+          const info = yield* session.get(ctx.params.sessionID).pipe(
             Effect.catchTag(
               "Session.NotFoundError",
               (error) =>
@@ -103,13 +106,13 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 }),
             ),
           )
-          if (user.role !== "admin" && session.userID !== user.id) {
+          if (user.role !== "admin" && info.userID !== user.id) {
             return yield* new SessionNotFoundError({
               sessionID: ctx.params.sessionID,
               message: "Session not found",
             })
           }
-          return { data: session }
+          return { data: info }
         }),
       )
       .handle(
