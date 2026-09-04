@@ -31,7 +31,7 @@ export function verifyPasswordHash(stored: string, pwd: string): Promise<boolean
       // 2. PHC 标准格式 "scrypt$N=..$r=..$p=..$saltHex$hashHex"（外部工具/旧数据）
       let saltHex: string
       let hashHex: string
-      let params = { N: SCRYPT_PARAMS.N, r: SCRYPT_PARAMS.r, p: SCRYPT_PARAMS.p }
+      let params: { N: number; r: number; p: number } = { N: SCRYPT_PARAMS.N, r: SCRYPT_PARAMS.r, p: SCRYPT_PARAMS.p }
       if (stored.startsWith("scrypt$")) {
         // PHC 格式：scrypt$N=..$r=..$p=..$salt$hash
         const parts = stored.split("$")
