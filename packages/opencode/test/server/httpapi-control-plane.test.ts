@@ -6,6 +6,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { SessionV2 } from "@opencode-ai/core/session"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { Installation } from "../../src/installation"
@@ -45,6 +47,9 @@ const apiLayer = HttpRouter.serve(
     }),
   ),
   Layer.provide(ServerAuth.Config.layer({ password: Option.none(), username: "opencode" })),
+  // yejian: authorizationLayer 依赖 User/AuthToken 做 cookie 认证，测试请求不带 cookie，mock 掉
+  Layer.provide(Layer.mock(User.Service)({})),
+  Layer.provide(Layer.mock(AuthToken.Service)({})),
 )
 const it = testEffect(apiLayer)
 
