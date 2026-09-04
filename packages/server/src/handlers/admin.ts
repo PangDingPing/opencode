@@ -78,8 +78,11 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
               yield* assertNotLastAdmin(id)
             }
           }
-          yield* userSvc.updateUser({ id, role, display_name })
-          const updated = yield* userSvc.getUser(id)
+          // yejian: updateUser 失败为普通 Error，映射为 endpoint 声明的 InvalidRequestError
+          yield* userSvc.updateUser({ id, role, display_name }).pipe(
+            Effect.mapError((e) => new InvalidRequestError({ message: (e as Error).message })),
+          )
+          const updated = yield* loadUser(id)
           return toResponse(updated)
         }),
       )
