@@ -15,9 +15,12 @@ const PUBLIC_PATHS = new Set([
   "/api/health",
 ])
 
-export class Authorization extends HttpApiMiddleware.Service<Authorization>()("@opencode/HttpApiAuthorization", {
-  error: UnauthorizedError,
-}) {}
+export class Authorization extends HttpApiMiddleware.Service<Authorization, { provides: CurrentUser }>()(
+  "@opencode/HttpApiAuthorization",
+  {
+    error: UnauthorizedError,
+  },
+) {}
 
 // 从 cookie 提取 session token（web 用）
 function tokenFromCookie(request: HttpServerRequest.HttpServerRequest): string | null {
@@ -69,7 +72,7 @@ export const authorizationLayer = Layer.effect(
           Effect.succeed(HttpServerResponseModule.HttpServerResponse.setHeader(response, "www-authenticate", 'Bearer realm="opencode"')),
         )
         return yield* new UnauthorizedError({ message: "Authentication required" })
-      }) as Effect.Effect<HttpServerResponse, never, never>,
+      }) as Effect.Effect<HttpServerResponse.HttpServerResponse, never, never>,
     ),
   ),
 )
