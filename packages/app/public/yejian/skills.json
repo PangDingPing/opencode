@@ -171,21 +171,13 @@
           "prompt": "[开发中] 请使用 总说明审查 技能，"
         },
         {
-          "name": "市系统下载PDF",
+          "name": "省/市系统下载PDF图纸",
           "developing": false,
           "skillId": "review-drawing-downloader",
           "tooltip": "从广州市施工图设计文件审查管理系统自动下载工程图纸。适用于审查师、项目助理等需要批量下载审图系统中工程图纸的用户。使用 Python 脚本通过 Selenium 自动化 Chrome 浏览器完成登录、搜索、筛选和下载流程。",
           "keyword": "从市审查系统下载图纸",
           "case": "从市审查系统下载 普宁项目 的第2版建筑专业的图纸",
-          "prompt": "重要提示，由于Docker容器内无法渲染审查系统的登录二维码，无法在本系统直接运行此程序。需请您的手动在终端执行python review_drawing_downloader.py。需要帮助，请联系庞定平。"
-        },
-        {
-          "name": "省系统下载PDF",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "省系统下载PDF",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 省系统下载PDF 技能，"
+          "prompt": "调用playwright-mcp-downloader技能，\n\n从【市系统 / 省系统】下载 【XX项目】 的【建筑 / 结构 / 给排水 / 电气 / 暖通 / 防雷 / 绿建 / 海绵城市 / 人防 / 节能 / 道路 / 桥梁 / 岩土 / 交通 / 园林 / 景观 / 全专业】专业的【第 x 版】图纸。\n"
         },
         {
           "name": "审查设计文件规范、图集是否最新版本",
@@ -222,8 +214,8 @@
           "skillId": "specification-auto-update",
           "tooltip": "自动化搜索未收录的建筑工程规范图集数据并保存到 HTML 文件。当需要搜索新建筑规范/标准或图集数据并保存到结构化 HTML 文件时触发。",
           "keyword": "/specification-auto-update <规范关键词>",
-          "case": "该技能为“规范审查”时查找到未收录的建筑工程规范图集数据自动触发去政府网站搜索并更新数据，无需手动调用。",
-          "prompt": "该技能为“规范审查”时查找到未收录的建筑工程规范图集数据自动触发去政府网站搜索并更新数据，无需手动调用。"
+          "case": "调用specification-auto-update技能对以下文件或资料提及的规范、标准数据进行更新。\n",
+          "prompt": "调用specification-auto-update技能对以下文件或资料提及的规范、标准数据进行更新。\n"
         }
       ]
     },
