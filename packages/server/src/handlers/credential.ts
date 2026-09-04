@@ -1,4 +1,5 @@
 import { Credential } from "@opencode-ai/core/credential"
+import { UserID } from "@opencode-ai/core/user/sql"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
@@ -23,7 +24,7 @@ export const CredentialHandler = HttpApiBuilder.group(Api, "server.credential", 
           integrationID: ctx.payload.integrationID,
           value: ctx.payload.value,
           label: ctx.payload.label,
-          userID: user.id,
+          userID: UserID.make(user.id),
         })
         return { data: { ...credential, value: maskCredentialValue(credential.value) } }
       }),
