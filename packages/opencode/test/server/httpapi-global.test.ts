@@ -7,6 +7,8 @@ import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { Installation } from "../../src/installation"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 import { ServerAuth } from "../../src/server/auth"
 import { RootHttpApi } from "../../src/server/routes/instance/httpapi/api"
 import { GlobalPaths } from "../../src/server/routes/instance/httpapi/groups/global"
@@ -39,6 +41,9 @@ const apiLayer = HttpRouter.serve(
     }),
   ),
   Layer.provide(ServerAuth.Config.layer({ password: Option.none(), username: "opencode" })),
+  // yejian: authorizationLayer 依赖 User/AuthToken 做 cookie 认证，测试请求不带 cookie，mock 掉
+  Layer.provide(Layer.mock(User.Service)({})),
+  Layer.provide(Layer.mock(AuthToken.Service)({})),
 )
 const it = testEffect(apiLayer)
 
