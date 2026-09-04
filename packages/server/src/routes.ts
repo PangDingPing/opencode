@@ -15,12 +15,12 @@ import { schemaErrorLayer } from "./middleware/schema-error"
 
 export function createRoutes(password?: string) {
   return HttpApiBuilder.layer(Api, { openapiPath: "/openapi.json" }).pipe(
-    // 必须先 provide 中间件 layers，再 provide handlers
-    // 因为 handlers 内部 .middleware(RequireAdmin) 引用 RequireAdmin key
+    // 与上游 httpapi/server.ts 组装顺序一致：先 provide handlers（引入 RequireAdmin 等 middleware key 依赖），
+    // 再 provide 中间件实现层去满足这些依赖；若先 provide 中间件，后加入的 handlers 的依赖无人满足
+    Layer.provide(handlers),
     Layer.provide(authorizationLayer),
     Layer.provide(requireAdminLayer),
     Layer.provide(schemaErrorLayer),
-    Layer.provide(handlers),
     Layer.provide(
       password
         ? ServerAuth.Config.layer({ username: "opencode", password: Option.some(password) })
