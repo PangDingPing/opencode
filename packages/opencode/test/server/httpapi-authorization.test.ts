@@ -10,6 +10,8 @@ import {
   ServerAuthorization,
   serverAuthorizationLayer,
 } from "../../src/server/routes/instance/httpapi/middleware/authorization"
+import { User } from "@opencode-ai/core/user"
+import { AuthToken } from "@opencode-ai/core/auth-token"
 import { testEffect } from "../lib/effect"
 
 const Api = HttpApi.make("test-authorization").add(
@@ -59,10 +61,12 @@ const v2ApiLayer = HttpRouter.serve(
 const noAuthLayer = ServerAuth.Config.layer({ password: Option.none(), username: "opencode" })
 const secretLayer = ServerAuth.Config.layer({ password: Option.some("secret"), username: "opencode" })
 const kitSecretLayer = ServerAuth.Config.layer({ password: Option.some("secret"), username: "kit" })
+// yejian: authorizationLayer 依赖 User/AuthToken 做 cookie 认证，测试请求不带 cookie，mock 掉
+const cookieAuthServices = Layer.mergeAll(Layer.mock(User.Service)({}), Layer.mock(AuthToken.Service)({}))
 
-const it = testEffect(apiLayer.pipe(Layer.provide(noAuthLayer)))
-const itSecret = testEffect(apiLayer.pipe(Layer.provide(secretLayer)))
-const itKitSecret = testEffect(apiLayer.pipe(Layer.provide(kitSecretLayer)))
+const it = testEffect(apiLayer.pipe(Layer.provide(noAuthLayer), Layer.provide(cookieAuthServices)))
+const itSecret = testEffect(apiLayer.pipe(Layer.provide(secretLayer), Layer.provide(cookieAuthServices)))
+const itKitSecret = testEffect(apiLayer.pipe(Layer.provide(kitSecretLayer), Layer.provide(cookieAuthServices)))
 const itV2Secret = testEffect(v2ApiLayer.pipe(Layer.provide(secretLayer)))
 
 const basic = (username: string, password: string) => ServerAuth.header({ username, password }) ?? ""
