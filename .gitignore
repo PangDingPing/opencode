@@ -48,6 +48,9 @@ smoke-out.txt
 evaluation-timezone-subagent/
 .trae-html-share-packages/
 
+# yejian: 本地工具 WorkBuddy 的运行数据（本地记忆，不入库）
+.workbuddy/
+
 # Python cache
 __pycache__/
 *.py[cod]
