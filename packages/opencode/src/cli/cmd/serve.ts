@@ -16,7 +16,7 @@ import { readFile } from "node:fs/promises"
  * - 没有用户且设了密码 → 创建 admin 账号
  */
 function bootstrapAdmin() {
-  return Effect.gen("Cli.serve.bootstrapAdmin", function* () {
+  return Effect.gen(function* () {
     const { db } = yield* Database.Service
     const result = yield* db.select({ c: count() }).from(UserTable).get().pipe(Effect.orDie)
     if (result && result.c > 0) return
@@ -41,7 +41,7 @@ function bootstrapAdmin() {
  * - 未设环境变量 / 文件不存在 / 文件格式错 → 静默跳过（不阻塞启动）
  */
 function bootstrapUsers() {
-  return Effect.gen("Cli.serve.bootstrapUsers", function* () {
+  return Effect.gen(function* () {
     const seedFile = process.env.OPENCODE_SEED_USERS_FILE
     if (!seedFile) return
 
@@ -97,17 +97,23 @@ export const ServeCommand = effectCmd({
       console.log("Info: OPENCODE_SERVER_PASSWORD 未设置，HTTP Basic Auth 已禁用，使用多用户登录系统（种子文件预置账号）")
     }
 
-    // 启动引导：确保 admin 账号存在
+    // 启动引导：确保 admin 账号存在（尽力而为，失败不阻塞启动）
     yield* bootstrapAdmin().pipe(
       Effect.provide(Database.defaultLayer),
       Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
       Effect.provide(Layer.merge(AuthToken.defaultLayer, Database.defaultLayer)),
+      Effect.catch((e) =>
+        Effect.sync(() => console.error(`[bootstrapAdmin] 失败（不阻塞启动）: ${(e as Error).message}`)),
+      ),
     )
 
     // 启动引导：从种子文件预置多用户（admin 创建后跑，便于多用户场景）
     yield* bootstrapUsers().pipe(
       Effect.provide(Database.defaultLayer),
       Effect.provide(Layer.merge(User.defaultLayer, Database.defaultLayer)),
+      Effect.catch((e) =>
+        Effect.sync(() => console.error(`[bootstrapUsers] 失败（不阻塞启动）: ${(e as Error).message}`)),
+      ),
     )
 
     const opts = yield* resolveNetworkOptions(args)
