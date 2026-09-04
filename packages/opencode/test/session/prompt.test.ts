@@ -41,6 +41,7 @@ import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
+import { User } from "@opencode-ai/core/user"
 import { Skill } from "../../src/skill"
 import { SystemPrompt } from "../../src/session/system"
 import { Shell } from "../../src/shell/shell"
@@ -214,6 +215,8 @@ function makePrompt(input?: { processor?: "blocking" }) {
   )
   return SessionPrompt.layer.pipe(
     Layer.provide(SessionRevert.defaultLayer),
+    // yejian: SessionPrompt 依赖 User.Service（系统提示词注入登录用户身份），测试会话无 user_id，mock 掉
+    Layer.provide(Layer.mock(User.Service)({})),
     Layer.provide(Image.defaultLayer),
     Layer.provide(summary),
     Layer.provideMerge(run),
