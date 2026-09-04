@@ -16,7 +16,9 @@ export const SESSION_COOKIE = "oc_session"
 export class CurrentUser extends Context.Service<CurrentUser, UserInfo>()("@opencode/CurrentUser") {}
 
 // 认证中间件：从 cookie 取 token → 验证 → 注入 CurrentUser
-export class CookieAuth extends HttpApiMiddleware.Service<CookieAuth>()("@opencode/CookieAuth", {
+// yejian: 声明 provides: CurrentUser（上游 WorkspaceRoutingMiddleware 同款），
+// 让 handler 里 `yield* CurrentUser` 的请求级依赖在类型层可满足
+export class CookieAuth extends HttpApiMiddleware.Service<CookieAuth, { provides: CurrentUser }>()("@opencode/CookieAuth", {
   error: UnauthorizedError,
 }) {}
 
@@ -85,7 +87,7 @@ export const cookieAuthLayer = Layer.effect(
 
         // 注入 CurrentUser 到上下文
         return yield* effect.pipe(Effect.provideService(CurrentUser, user))
-      }) as Effect.Effect<HttpServerResponse, never, never>,
+      }) as Effect.Effect<HttpServerResponse.HttpServerResponse, never, never>,
     ),
   ),
 )
