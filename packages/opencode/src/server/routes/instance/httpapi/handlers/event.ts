@@ -2,7 +2,9 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { GlobalBus } from "@/bus/global"
 import { EventV2 } from "@opencode-ai/core/event"
-import { Effect, Queue } from "effect"
+import { sessionEventGuard, type SessionEventOwner } from "@opencode-ai/core/session/ownership"
+import { CurrentUser } from "@opencode-ai/server/middleware/auth"
+import { Effect, Option, Queue } from "effect"
 import * as Stream from "effect/Stream"
 import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -26,6 +28,14 @@ function eventResponse(events: EventV2.Interface) {
   return Effect.gen(function* () {
     const instance = yield* InstanceState.context
     const workspaceID = yield* InstanceState.workspaceID
+    // yejian: 解析当前登录用户（Authorization 中间件已鉴权）+ 会话域事件归属过滤器。
+    // 未鉴权（None）时 fail-closed：会话域事件全部丢弃，仅放行非会话域事件；admin 放行。
+    const currentUser = yield* Effect.serviceOption(CurrentUser)
+    const owner: SessionEventOwner = {
+      userID: Option.isSome(currentUser) ? currentUser.value.id : undefined,
+      isAdmin: Option.isSome(currentUser) && currentUser.value.role === "admin",
+    }
+    const check = yield* sessionEventGuard()
     // Listener registration is eager, so events published after this point cannot
     // be lost while the HTTP body fiber is starting or emitting server.connected.
     const queue = yield* Queue.unbounded<EventV2.Payload>()
@@ -36,6 +46,10 @@ function eventResponse(events: EventV2.Interface) {
         (event) =>
           event.location?.directory === instance.directory &&
           (event.location.workspaceID === undefined || event.location.workspaceID === workspaceID),
+      ),
+      // yejian: 会话域事件按当前登录用户过滤，阻断跨用户泄露
+      Stream.filterEffect((event) =>
+        check({ type: event.type, data: event.data, owner }).pipe(Effect.map((ok) => ok === true)),
       ),
       Stream.map((event) => ({ id: event.id, type: event.type, properties: event.data })),
     )
