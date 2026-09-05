@@ -1,6 +1,14 @@
 # syntax=docker/dockerfile:1.4
 # opencode Docker image - Multi-stage build (Alpine + musl)
 #
+# v0.1.6: skill 依赖更新（对齐 2026-09-04 重装的 skills 目录）
+#         - npm 全局新增 pptx skill 依赖：pptxgenjs react-icons react react-dom sharp
+#         - requirements-ppt.txt 对齐新版 ppt-master（+PyYAML/XlsxWriter/skia-pathops/uharfbuzz，
+#           移除旧 svglib 方案）
+#         - requirements.txt 新增 python-docx（online-to-md Word 拆分）
+#         - 内置 TZ=Asia/Shanghai + tzdata（v0.1.5 后已有）
+#         - 本版镜像包含 20260905 会话隔离 SSE 归属过滤修复
+#
 # v0.0.8: 构建加速优化 + 回到 musl/Alpine 方案
 #         - 国内镜像源（apk 阿里云 / pip 清华 / npm 淘宝 / bun 淘宝）
 #         - 完善 BuildKit 缓存挂载（apk/bun/pip/npm 下载缓存持久化）
@@ -125,10 +133,15 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --break-system-packages -r /tmp/requirements-ppt.txt \
  && rm -f /tmp/requirements-ppt.txt
 
-# 用 npm 安装 3 个全局包
+# 用 npm 安装全局包
+# - docx             : docx skill + document-format 公文排版 + 绿建审查报告生成
+# - pdf-lib pdfjs-dist: pdf skill JS 路线
+# - pptxgenjs        : pptx skill（PPT 生成）
+# - react-icons react react-dom sharp : pptx skill 图标渲染（react-icons → SVG → sharp 栅格化）
+# v0.1.6: 新增 pptx skill 5 个包；sharp 会按 musl 自动选择 linuxmusl 预编译二进制
 # 使用 cache 挂载持久化 npm 下载缓存
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g docx pdf-lib pdfjs-dist
+    npm install -g docx pdf-lib pdfjs-dist pptxgenjs react-icons react react-dom sharp
 
 # 烤入多用户预置清单（v0.0.6 新增）
 COPY docker/seed-users.json /etc/opencode/seed-users.json
