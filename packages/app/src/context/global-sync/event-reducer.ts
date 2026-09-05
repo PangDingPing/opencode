@@ -90,6 +90,17 @@ export function cleanupDroppedSessionCaches(
   )
 }
 
+// yejian: 会话事件归属兜底校验。SDK 类型尚未包含 user_id（后端 Session 信息有），
+// 这里用结构读取。非 admin 且归属不匹配（含无主会话、身份缺失但会话有主）时
+// 返回 false，调用方丢弃该事件。
+function ownedByCurrentUser(
+  info: Session,
+  input: { currentUserID?: string; isAdmin?: boolean },
+): boolean {
+  if (input.isAdmin) return true
+  return (info as { user_id?: string }).user_id === input.currentUserID
+}
+
 export function applyDirectoryEvent(input: {
   event: { type: string; properties?: unknown }
   store: Store<State>
@@ -100,6 +111,12 @@ export function applyDirectoryEvent(input: {
   vcsCache?: VcsCache
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
   retainedLimit?: number
+  // yejian: 当前登录用户身份，用于会话事件归属兜底校验（服务端 SSE 已按归属
+  // 过滤，这里是第二道防线）：非 admin 且会话 user_id 与当前用户不一致时丢弃
+  // 该事件，防止跨用户的 session.* 事件污染会话列表。两边都缺省时放行
+  // （未登录/测试环境，真实部署 ServerSync 在 AuthGate 内运行，身份必存在）。
+  currentUserID?: string
+  isAdmin?: boolean
 }) {
   const event = input.event
   const limit = Math.max(input.store.limit, input.retainedLimit ?? 0)
@@ -110,6 +127,7 @@ export function applyDirectoryEvent(input: {
     }
     case "session.created": {
       const info = (event.properties as { info: Session }).info
+      if (!ownedByCurrentUser(info, input)) break
       const result = Binary.search(input.store.session, info.id, (s) => s.id)
       if (result.found) {
         input.setStore("session", result.index, reconcile(info))
@@ -125,6 +143,7 @@ export function applyDirectoryEvent(input: {
     }
     case "session.updated": {
       const info = (event.properties as { info: Session }).info
+      if (!ownedByCurrentUser(info, input)) break
       const result = Binary.search(input.store.session, info.id, (s) => s.id)
       if (info.time.archived) {
         if (input.store.session[result.index]!.time.archived === info.time.archived) break
@@ -154,6 +173,7 @@ export function applyDirectoryEvent(input: {
     }
     case "session.deleted": {
       const info = (event.properties as { info: Session }).info
+      if (!ownedByCurrentUser(info, input)) break
       const result = Binary.search(input.store.session, info.id, (s) => s.id)
       if (result.found) {
         input.setStore(

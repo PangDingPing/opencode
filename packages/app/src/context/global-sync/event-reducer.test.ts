@@ -187,6 +187,72 @@ describe("applyDirectoryEvent", () => {
     expect(store.sessionTotal).toBe(2)
   })
 
+  // yejian: 会话事件归属兜底校验（多用户隔离第二道防线）
+  test("drops session events owned by other users and keeps own/admin/unattributed events", () => {
+    const [store, setStore] = createStore(baseState())
+    const own = { ...rootSession({ id: "a" }), user_id: "usr_me" } as Session
+    const other = { ...rootSession({ id: "b" }), user_id: "usr_other" } as Session
+
+    // 他人会话事件 → 丢弃
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: other } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      currentUserID: "usr_me",
+    })
+    expect(store.session).toHaveLength(0)
+
+    // 本人会话事件 → 保留
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: own } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      currentUserID: "usr_me",
+    })
+    expect(store.session.map((x) => x.id)).toEqual(["a"])
+
+    // 无主会话（无 user_id）对普通用户 → 丢弃
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: rootSession({ id: "c" }) } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      currentUserID: "usr_me",
+    })
+    expect(store.session).toHaveLength(1)
+
+    // admin → 放行（含无主会话）
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: rootSession({ id: "c" }) } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      isAdmin: true,
+    })
+    expect(store.session.map((x) => x.id)).toEqual(["a", "c"])
+
+    // 双边缺省（无身份 & 会话无 user_id）→ 放行（未登录/旧测试兼容）
+    applyDirectoryEvent({
+      event: { type: "session.created", properties: { info: rootSession({ id: "d" }) } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+    expect(store.session.map((x) => x.id)).toEqual(["a", "c", "d"])
+  })
+
   test("cleans session caches when archived", () => {
     const message = userMessage("msg_1", "ses_1")
     const [store, setStore] = createStore(

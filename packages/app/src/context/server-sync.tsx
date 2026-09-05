@@ -4,6 +4,7 @@ import { getFilename } from "@opencode-ai/core/util/path"
 import { batch, getOwner, onCleanup, onMount, untrack } from "solid-js"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useLanguage } from "@/context/language"
+import { useCurrentUserOptional } from "@/context/auth"
 import type { InitError } from "../pages/error"
 import { ServerSDK, useServerSDK } from "./server-sdk"
 import {
@@ -87,6 +88,8 @@ export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 export function createServerSyncContextInner(_serverSDK?: ServerSDK) {
   const serverSDK: ServerSDK = _serverSDK ?? useServerSDK()
   const language = useLanguage()
+  // yejian: 当前登录用户（可选），用于会话事件归属兜底校验
+  const currentUser = useCurrentUserOptional()
   const owner = getOwner()
   if (!owner) throw new Error("ServerSync must be created within owner")
 
@@ -407,6 +410,9 @@ export function createServerSyncContextInner(_serverSDK?: ServerSDK) {
       setSessionTodo,
       retainedLimit: sessionMeta.get(key)?.limit,
       vcsCache: children.vcsCache.get(key),
+      // yejian: 传入当前登录用户身份，供 reducer 做会话事件归属兜底校验
+      currentUserID: currentUser?.id,
+      isAdmin: currentUser?.role === "admin",
       loadLsp: () => {
         void queryClient.fetchQuery(queryOptionsApi.lsp(key))
       },
