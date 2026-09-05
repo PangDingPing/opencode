@@ -2,10 +2,12 @@ import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
 import { EventV2 } from "@opencode-ai/core/event"
+import { sessionEventGuard, type SessionEventOwner } from "@opencode-ai/core/session/ownership"
+import { CurrentUser } from "@opencode-ai/server/middleware/auth"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
-import { Effect, Queue, Schema } from "effect"
+import { Effect, Option, Queue, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
@@ -30,9 +32,38 @@ function parseBody(body: string) {
   }
 }
 
+// yejian: GlobalBus payload 有两种形态：普通事件 { type, properties } 与
+// sync 事件 { type: "sync", syncEvent: { type, aggregateID, data } }。
+// 统一归一化为 (type, data, sessionID 兜底) 再交给归属过滤器。
+function guardInput(payload: unknown, owner: SessionEventOwner) {
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>
+    if (p["type"] === "sync" && p["syncEvent"] && typeof p["syncEvent"] === "object") {
+      const sync = p["syncEvent"] as Record<string, unknown>
+      return {
+        type: sync["type"],
+        data: sync["data"],
+        sessionID: typeof sync["aggregateID"] === "string" ? sync["aggregateID"] : undefined,
+        owner,
+      }
+    }
+    return { type: p["type"], data: p["properties"], owner }
+  }
+  return { type: undefined, data: undefined, owner }
+}
+
 function eventResponse() {
   return Effect.gen(function* () {
     yield* Effect.logInfo("global event connected")
+    // yejian: 解析当前登录用户（Authorization 中间件已鉴权）+ 会话域事件归属过滤器。
+    // SSE 连接生命周期内用户身份不变，连接建立时解析一次即可；
+    // 未鉴权（None）时 fail-closed：会话域事件全部丢弃，仅放行非会话域事件。
+    const currentUser = yield* Effect.serviceOption(CurrentUser)
+    const owner: SessionEventOwner = {
+      userID: Option.isSome(currentUser) ? currentUser.value.id : undefined,
+      isAdmin: Option.isSome(currentUser) && currentUser.value.role === "admin",
+    }
+    const check = yield* sessionEventGuard()
     const events = Stream.callback<GlobalBusEvent>((queue) => {
       const handler = (event: GlobalBusEvent) => Queue.offerUnsafe(queue, event)
       return Effect.acquireRelease(
@@ -47,7 +78,15 @@ function eventResponse() {
 
     return HttpServerResponse.stream(
       Stream.make({ payload: { id: EventV2.ID.create(), type: "server.connected", properties: {} } }).pipe(
-        Stream.concat(events.pipe(Stream.merge(heartbeat, { haltStrategy: "left" }))),
+        Stream.concat(
+          events.pipe(
+            // yejian: 会话域事件按当前登录用户过滤，阻断跨用户泄露（admin 放行）
+            Stream.filterEffect((event) =>
+              check(guardInput(event.payload, owner)).pipe(Effect.map((ok) => ok === true)),
+            ),
+            Stream.merge(heartbeat, { haltStrategy: "left" }),
+          ),
+        ),
         Stream.map(eventData),
         Stream.pipeThroughChannel(Sse.encode()),
         Stream.encodeText,
