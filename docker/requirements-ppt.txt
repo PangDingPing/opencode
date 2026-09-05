@@ -1,37 +1,47 @@
-# PPT Master Skill 依赖（v0.0.6 新增）
-# 来源：E:\AI\YEJIAN\.opencode\skills\ppt-master\requirements.txt
-# 精简方案：用 svglib（方案 B，~5MB）替代 cairosvg（方案 A，~25MB）
-# 不装 pandoc（仅处理 .docx/.html/.epub/.ipynb/.xlsx 五种原生格式）
+# PPT Master Skill 依赖（v0.1.6 对齐 2026-09-04 新版 ppt-master/requirements.txt）
+# 变化：新版 svg_to_pptx 改用 skia-pathops + uharfbuzz（原生 DrawingML 物化），
+#       旧版 svglib 方案移除；reportlab 已由 requirements.txt（pdf skill）覆盖；
+#       新增模板注册（PyYAML）与 XlsxWriter（表格物化）。
 
-# SVG 转 PPTX + 旁白音频
+# 模板注册 (scripts/register_template.py)
+PyYAML>=6.0
+
+# SVG 转 PPTX 工具 (scripts/svg_to_pptx.py)
 python-pptx>=0.6.21
-edge-tts>=7.2.8
-svglib>=1.5.0
-reportlab>=4.0.0
+XlsxWriter>=3.0.0
+# PowerPoint 风格合并形状物化
+skia-pathops>=0.9.2
+# OpenType shaping + 文字轮廓
+uharfbuzz>=0.50.0
 
-# PDF 转 Markdown
+# 录制计时和旁白 (notes_to_audio.py)
+edge-tts>=7.2.8
+
+# PDF 转 Markdown (scripts/source_to_md/pdf_to_md.py)
 PyMuPDF>=1.23.0
 
-# 文档转 Markdown（.docx/.html/.epub/.ipynb）
+# 文档转 Markdown (scripts/source_to_md/doc_to_md.py，纯 Python 原生路径)
+# .docx → mammoth / .html → markdownify / .epub → ebooklib / .ipynb → nbconvert
 mammoth>=1.6.0
 markdownify>=0.11.6
 ebooklib>=0.18
 nbconvert>=7.0.0
 
-# Excel 转 Markdown
+# Excel 转 Markdown (scripts/source_to_md/excel_to_md.py)
 openpyxl>=3.1.0
 
-# 图片处理
+# 图片处理 (fix_image_aspect.py / gemini_watermark_remover.py)
 Pillow>=9.0.0
 numpy>=1.20.0
 
-# 网页转 Markdown
+# 网页转 Markdown (scripts/source_to_md/web_to_md.py)
 requests>=2.31.0
 beautifulsoup4>=4.12.0
+# TLS 指纹伪装（微信公众号等屏蔽 Python TLS 指纹的站点，可选自动启用）
 curl_cffi>=0.7.0
 
-# AI 图片生成（Gemini 后端）
+# AI 图片生成 (scripts/image_gen.py，Gemini 后端)
 google-genai>=1.0.0
 
-# SVG 编辑器（本地 Web 编辑器）
+# SVG 编辑器 (scripts/svg_editor/server.py，本地 Web 编辑器)
 flask>=3.0.0
