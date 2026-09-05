@@ -1,4 +1,4 @@
-# Builds opencode Docker image using multi-stage build
+﻿# Builds opencode Docker image using multi-stage build
 #
 # v0.0.8: 构建加速优化
 #         - 国内镜像源（apt 清华 / pip 清华 / npm 淘宝 / bun 淘宝）
@@ -14,8 +14,8 @@
 
 param(
     [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "yejian-AIworkbench",
-    [string]$ImageTag = "v0.1.3",
+    [string]$ContainerName = "yejian-v0.1.6",
+    [string]$ImageTag = "v0.1.6",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
@@ -104,6 +104,8 @@ try {
     #       Use two separate code paths instead.
     Write-Host ""
     Write-Host "=== Starting Container ===" -ForegroundColor Cyan
+    # v0.1.6: image already has ENV TZ=Asia/Shanghai baked in; keep -e here to match
+    #         the user's standard docker run command template
     if ($EnvFile -ne "") {
         if (-not (Test-Path $EnvFile)) {
             Write-Host "ERROR: env file not found: $EnvFile" -ForegroundColor Red
@@ -116,6 +118,7 @@ try {
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -w /YEJIAN `
+            -e TZ=Asia/Shanghai `
             --hostname 0.0.0.0 `
             --env-file "$EnvFile" `
             --restart always `
@@ -127,6 +130,7 @@ try {
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -w /YEJIAN `
+            -e TZ=Asia/Shanghai `
             --hostname 0.0.0.0 `
             --restart always `
             "${ImageName}:${ImageTag}"
