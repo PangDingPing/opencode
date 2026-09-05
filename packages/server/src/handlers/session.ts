@@ -18,6 +18,29 @@ import path from "path"
 
 const DefaultSessionsLimit = 50
 
+// yejian: V2 端点归属校验。非 admin 用户只能操作自己会话；
+// 与 session.get 的检查语义一致（admin 放行，user_id 不匹配 → 404，避免泄露会话存在性）。
+function assertSessionOwnership(sessionID: SessionV2.ID) {
+  return Effect.gen(function* () {
+    const session = yield* SessionV2.Service
+    const user = yield* CurrentUser
+    const info = yield* session.get(sessionID).pipe(
+      Effect.catchTag(
+        "Session.NotFoundError",
+        (error) =>
+          new SessionNotFoundError({
+            sessionID: error.sessionID,
+            message: `Session not found: ${error.sessionID}`,
+          }),
+      ),
+    )
+    if (user.role !== "admin" && info.userID !== user.id) {
+      return yield* new SessionNotFoundError({ sessionID, message: "Session not found" })
+    }
+    return info
+  })
+}
+
 export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handlers) =>
   Effect.gen(function* () {
     const session = yield* SessionV2.Service
@@ -118,6 +141,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.prompt",
         Effect.fn(function* (ctx) {
+          // yejian: 校验会话归属
+          yield* assertSessionOwnership(ctx.params.sessionID)
           return {
             data: yield* session
               .prompt({
@@ -151,6 +176,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.compact",
         Effect.fn(function* (ctx) {
+          // yejian: 校验会话归属
+          yield* assertSessionOwnership(ctx.params.sessionID)
           yield* session.compact({ sessionID: ctx.params.sessionID }).pipe(
             Effect.catchTag("Session.NotFoundError", (error) =>
               Effect.fail(
@@ -175,6 +202,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.wait",
         Effect.fn(function* (ctx) {
+          // yejian: 校验会话归属
+          yield* assertSessionOwnership(ctx.params.sessionID)
           yield* session.wait(ctx.params.sessionID).pipe(
             Effect.catchTag("Session.NotFoundError", (error) =>
               Effect.fail(
@@ -199,6 +228,8 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.context",
         Effect.fn(function* (ctx) {
+          // yejian: 校验会话归属
+          yield* assertSessionOwnership(ctx.params.sessionID)
           return {
             data: yield* session.context(ctx.params.sessionID).pipe(
               Effect.catchTag("Session.NotFoundError", (error) =>
