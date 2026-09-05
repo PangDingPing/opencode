@@ -21,3 +21,6 @@ numpy>=1.24.0         # pypdfium2 / pandas 依赖
 
 # ----- xlsx skill -----
 openpyxl>=3.1.0       # 创建/编辑/读取 Excel (含公式/格式)
+
+# ----- online-to-md skill (v0.1.6 新增) -----
+python-docx>=1.1.0    # Word 文档自动拆分 (MinerU 单任务 200 页限制)
