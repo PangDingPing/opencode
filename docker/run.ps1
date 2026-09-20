@@ -1,5 +1,9 @@
 # opencode Docker run script
 # Start the pre-built container (v0.0.3 supports -EnvFile for API key injection)
+# v1.2 性能优化 A1: /root/.local/share/opencode (SQLite 数据库所在) 改用 named volume,
+# 落在 WSL2 ext4 文件系统上, 绕开 Windows bind mount 的 gRPC-FUSE 共享层, 写路径延迟改善 5~10 倍。
+# 其余目录 (/workspace, /tmp) 保持 bind mount 不变。
+# 注意: 首次使用前需执行数据迁移 (见 docker/readme.md "数据迁卷" 一节), 否则容器内数据库为空。
 # Note: All user-facing strings are English to avoid PowerShell encoding issues
 #       (see readme.md "pitfall 1" for the encoding pitfall this prevents)
 
@@ -51,6 +55,7 @@ if ($EnvFile -ne "") {
         -p "${HostPort}:${ContainerPort}" `
         -v "D:\AI\AIworkbench:/workspace" `
         -v "D:\AI\AIworkbench-data\root:/root" `
+        -v "yejian-opencode-data:/root/.local/share/opencode" `
         -v "D:\AI\AIworkbench-data\tmp:/tmp" `
         -w /workspace `
         --hostname 0.0.0.0 `
@@ -61,6 +66,7 @@ if ($EnvFile -ne "") {
         -p "${HostPort}:${ContainerPort}" `
         -v "D:\AI\AIworkbench:/workspace" `
         -v "D:\AI\AIworkbench-data\root:/root" `
+        -v "yejian-opencode-data:/root/.local/share/opencode" `
         -v "D:\AI\AIworkbench-data\tmp:/tmp" `
         -w /workspace `
         --hostname 0.0.0.0 `
