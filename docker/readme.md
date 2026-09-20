@@ -178,6 +178,32 @@ docker run -d --name yejian-AIworkbench -p 8088:8088 `
 | `-w /workspace` | 设置工作目录 |
 | `--hostname 0.0.0.0` | 监听所有网卡 |
 
+### 4.5 数据迁卷（A1 性能优化，一次性）
+
+**背景**：SQLite 数据库原落在 Windows bind mount（`D:\AI\AIworkbench-data\root`）上，经 Docker Desktop 的 gRPC-FUSE 共享层读写，写路径延迟高。现改为 named volume `yejian-opencode-data` 挂载到 `/root/.local/share/opencode`（落在 WSL2 虚拟机的 ext4 上），写路径延迟改善 5~10 倍。run.ps1 已内置该挂载。
+
+**首次启用前必须迁移数据**（否则容器内数据库为空，无法登录）。容器已停止时执行：
+
+```powershell
+# 1. 创建 named volume
+docker volume create yejian-opencode-data
+
+# 2. 收敛 WAL（把 -wal 日志合并回主库文件）
+docker run --rm -v "D:\AI\AIworkbench-data\root:/root" yejian-opencode:v0.1.6 `
+  python3 -c "import sqlite3; c=sqlite3.connect('/root/.local/share/opencode/opencode.db'); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close(); print('checkpoint done')"
+
+# 3. 拷贝数据目录到 named volume（含数据库、log、repos）
+docker run --rm -v "D:\AI\AIworkbench-data\root:/src-root" -v "yejian-opencode-data:/dst" yejian-opencode:v0.1.6 `
+  sh -c "cp -a /src-root/.local/share/opencode/. /dst/ && ls -la /dst/"
+
+# 4. 正常启动（run.ps1 已带 named volume 挂载）
+.\run.ps1
+```
+
+**验证**：登录 Web 正常、历史会话可见即可。
+
+**回滚**：原目录 `D:\AI\AIworkbench-data\root\.local\share\opencode` **保留不删（至少一周）**。若需回滚，删掉 run.ps1 中的 named volume 挂载行即可回到 bind mount 方案。
+
 ### 5. 验证
 
 打开浏览器访问：**http://localhost:8088**
