@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.4
 # opencode Docker image - Multi-stage build (Alpine + musl)
 #
+# v0.1.7: Alpine 源换华为云（实测下载快约 55 倍——阿里云约61KB/s 卡死，华为云约3.4MB/s）
+#         含 skills.json 变更（公文排版→gov-doc-format；新增公文写作→chinese-official-writing）
 # v0.1.6: skill 依赖更新（对齐 2026-09-04 重装的 skills 目录）
 #         - npm 全局新增 pptx skill 依赖：pptxgenjs react-icons react react-dom sharp
 #         - requirements-ppt.txt 对齐新版 ppt-master（+PyYAML/XlsxWriter/skia-pathops/uharfbuzz，
@@ -32,7 +34,7 @@ WORKDIR /build
 # - python3 make g++: node-gyp 编译 native 模块（tree-sitter-powershell 等）
 # 阿里云 Alpine 镜像源 + cache 挂载加速
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
-    sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
+    sed -i 's|dl-cdn.alpinelinux.org|mirrors.huaweicloud.com|g' /etc/apk/repositories && \
     apk add --update --cache-dir /var/cache/apk git ca-certificates python3 make g++
 
 # COPY 源代码（.dockerignore 排除了 node_modules/dist/.git）
@@ -88,7 +90,7 @@ ENV TZ=Asia/Shanghai
 # - tzdata             : 时区数据（配合 TZ=Asia/Shanghai）
 # 使用 cache 挂载加速 apk 下载（缓存持久化，下次构建跳过下载）
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
-    sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories && \
+    sed -i 's|dl-cdn.alpinelinux.org|mirrors.huaweicloud.com|g' /etc/apk/repositories && \
     apk add --update --cache-dir=/var/cache/apk \
     libgcc libstdc++ ripgrep xdg-utils \
     bash git curl ca-certificates \
