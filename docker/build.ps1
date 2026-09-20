@@ -14,8 +14,8 @@
 
 param(
     [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "yejian-v0.1.6",
-    [string]$ImageTag = "v0.1.6",
+    [string]$ContainerName = "yejian-v0.1.7",
+    [string]$ImageTag = "v0.1.7",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
@@ -117,6 +117,7 @@ try {
             -v "${workbenchDir}:/YEJIAN" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
+            -v "yejian-opencode-data:/root/.local/share/opencode" `
             -w /YEJIAN `
             -e TZ=Asia/Shanghai `
             --hostname 0.0.0.0 `
@@ -129,6 +130,7 @@ try {
             -v "${workbenchDir}:/YEJIAN" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
+            -v "yejian-opencode-data:/root/.local/share/opencode" `
             -w /YEJIAN `
             -e TZ=Asia/Shanghai `
             --hostname 0.0.0.0 `
