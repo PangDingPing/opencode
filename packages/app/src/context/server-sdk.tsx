@@ -48,7 +48,9 @@ export function createServerSdkContext(server: ServerConnection.Any, scope: Serv
   type Queued = { directory: string; payload: Event }
   const FLUSH_FRAME_MS = 16
   const STREAM_YIELD_MS = 8
-  const RECONNECT_DELAY_MS = 250
+  // yejian: 重连退避——500ms 起步逐次翻倍、上限 4s，避免服务端繁忙时所有标签页同步高频重连
+  const RECONNECT_MIN_DELAY_MS = 500
+  const RECONNECT_MAX_DELAY_MS = 4_000
 
   let queue: Queued[] = []
   let buffer: Queued[] = []
@@ -108,7 +110,9 @@ export function createServerSdkContext(server: ServerConnection.Any, scope: Serv
   let run: Promise<void> | undefined
   let started = false
   let generation = 0
-  const HEARTBEAT_TIMEOUT_MS = 15_000
+  let reconnectDelayMs = RECONNECT_MIN_DELAY_MS
+  // yejian: 服务端心跳间隔 10s，15s 超时余量过紧易误触发重连风暴，放宽到 30s
+  const HEARTBEAT_TIMEOUT_MS = 30_000
   let lastEventAt = Date.now()
   let heartbeat: ReturnType<typeof setTimeout> | undefined
   const resetHeartbeat = () => {
@@ -157,6 +161,8 @@ export function createServerSdkContext(server: ServerConnection.Any, scope: Serv
           resetHeartbeat()
           for await (const event of events.stream) {
             resetHeartbeat()
+            // yejian: 收到事件说明连接健康，重连退避复位
+            reconnectDelayMs = RECONNECT_MIN_DELAY_MS
             streamErrorLogged = false
             const directory = event.directory ?? "global"
             if (event.payload.type === "sync") {
@@ -201,7 +207,9 @@ export function createServerSdkContext(server: ServerConnection.Any, scope: Serv
         }
 
         if (abort.signal.aborted || !started || generation !== active) return
-        await wait(RECONNECT_DELAY_MS)
+        // yejian: 指数退避 + 0~25% 随机抖动，切断"越慢越断、越断越慢"的同步重连风暴
+        await wait(reconnectDelayMs + reconnectDelayMs * Math.random() * 0.25)
+        reconnectDelayMs = Math.min(RECONNECT_MAX_DELAY_MS, reconnectDelayMs * 2)
       }
     })().finally(() => {
       if (run !== current) return
