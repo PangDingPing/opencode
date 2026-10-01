@@ -232,7 +232,7 @@
           "prompt": "[开发中] 请使用 宣传稿撰写 技能，"
         },
         {
-          "name": "公文写作",
+          "name": "公文写作（去口语化、去AI味）",
           "developing": false,
           "skillId": "chinese-official-writing",
           "tooltip": "起草、改写、压缩、复核中文公文、事务性材料及新闻稿件。支持申请、请示、报告、通知、通告、意见、决定、决议、通报、批复、函、纪要、总结、调研、讲话、致辞、制度、管理办法、工作要点、新闻稿、新闻评论等多种文种，兼顾办公效率、事实边界、行文关系和正式表达，避免口语化与 AI 味。",
@@ -441,22 +441,6 @@
       "id": "other",
       "name": "其它",
       "skills": [
-        {
-          "name": "幻觉检测",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "幻觉检测",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 幻觉检测 技能，"
-        },
-        {
-          "name": "文章去AI味",
-          "developing": true,
-          "tooltip": "功能开发中",
-          "keyword": "文章去AI味",
-          "case": "功能开发中",
-          "prompt": "[开发中] 请使用 文章去AI味 技能，"
-        },
         {
           "name": "网络调研",
           "developing": false,
