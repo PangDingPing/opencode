@@ -23,6 +23,8 @@
     "./user/*": "./src/user/*.ts",
     "./auth-token": "./src/auth-token/index.ts",
     "./auth-token/*": "./src/auth-token/*.ts",
+    "./auth-audit": "./src/auth-audit/index.ts",
+    "./auth-audit/*": "./src/auth-audit/*.ts",
     "./*": "./src/*.ts"
   },
   "imports": {
