@@ -20,11 +20,14 @@ import { CredentialGroup } from "./groups/credential"
 import { ProjectCopyGroup } from "./groups/project-copy"
 import { AuthGroup } from "./groups/auth"
 import { AdminGroup } from "./groups/admin"
+// yejian: admin 监控路由组（在线用户 + 登录审计）
+import { AdminMonitorGroup } from "./groups/admin-monitor"
 
 export const Api = HttpApi.make("server")
   .add(HealthGroup)
   .add(AuthGroup)
   .add(AdminGroup)
+  .add(AdminMonitorGroup) // yejian: 在线用户 + 登录审计端点
   .add(LocationGroup)
   .add(AgentGroup)
   .add(SessionGroup)
