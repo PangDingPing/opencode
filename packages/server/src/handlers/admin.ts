@@ -3,6 +3,8 @@ import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import { Api } from "../api"
 import { User, type UserInfo } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
+// yejian: 登录审计服务（踢下线/禁用埋点）
+import { AuthAudit } from "@opencode-ai/core/auth-audit"
 import { CurrentUser } from "../middleware/auth"
 import { ForbiddenError, InvalidRequestError, ConflictError } from "../errors"
 
@@ -24,6 +26,8 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
   Effect.gen(function* () {
     const userSvc = yield* User.Service
     const tokenSvc = yield* AuthToken.Service
+    // yejian: 登录审计服务（踢下线/禁用埋点，best-effort 不影响主流程）
+    const auditSvc = yield* AuthAudit.Service
 
     // 自保护：不能对自己执行某操作
     const assertNotSelf = (targetId: string, action: string) =>
@@ -108,6 +112,9 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
           yield* userSvc.setDisabled(id, true)
           // 联动撤销该用户所有 session，防止已登录的禁用用户继续操作
           yield* tokenSvc.revokeAllForUser(id)
+          // yejian: 禁用审计（禁用与踢下线分开记录，审计语义不混淆）
+          const admin = yield* CurrentUser
+          yield* auditSvc.record({ userId: id, username: target.username, action: "disabled", operator: admin.username })
           return { ok: true as const }
         }),
       )
@@ -122,7 +129,12 @@ export const AdminHandler = HttpApiBuilder.group(Api, "server.admin", (handlers)
         Effect.gen(function* () {
           const { id } = req.params
           yield* assertNotSelf(id, "踢下线")
+          // yejian: 补加载目标用户（审计需要 username 快照）
+          const target = yield* loadUser(id)
           yield* tokenSvc.revokeAllForUser(id)
+          // yejian: 踢下线审计（记录操作管理员）
+          const admin = yield* CurrentUser
+          yield* auditSvc.record({ userId: id, username: target.username, action: "kicked", operator: admin.username })
           return { ok: true as const }
         }),
       )
