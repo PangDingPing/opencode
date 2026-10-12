@@ -1,9 +1,11 @@
-import { Effect, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { HttpServerResponse, HttpServerRequest, HttpEffect } from "effect/unstable/http"
 import { Api } from "../api"
 import { User } from "@opencode-ai/core/user"
 import { AuthToken } from "@opencode-ai/core/auth-token"
+// yejian: 登录审计服务（登录成功/登出/登录失败埋点）
+import { AuthAudit } from "@opencode-ai/core/auth-audit"
 import { CurrentUser, SESSION_COOKIE } from "../middleware/auth"
 import { UnauthorizedError, InvalidRequestError } from "../errors"
 
@@ -53,14 +55,25 @@ function parseCookie(cookieHeader: string): string | null {
   return null
 }
 
+// yejian: 归一化 TCP 对端地址（IPv6 mapped IPv4 "::ffff:192.168.1.5" → "192.168.1.5"）
+function normalizeRemoteIP(addr: string): string {
+  if (addr.startsWith("::ffff:")) return addr.slice(7)
+  return addr
+}
+
+// 客户端 IP 解析链：代理头优先 → TCP 对端地址（局域网直连无代理头时的兜底）→ unknown
 function getRequestIP(request: HttpServerRequest.HttpServerRequest): string {
-  return request.headers["x-forwarded-for"] ?? request.headers["x-real-ip"] ?? "unknown"
+  const remote = request.remoteAddress
+  const remoteIP = Option.isSome(remote) ? normalizeRemoteIP(remote.value) : undefined
+  return request.headers["x-forwarded-for"] ?? request.headers["x-real-ip"] ?? remoteIP ?? "unknown"
 }
 
 export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =>
   Effect.gen(function* () {
     const userSvc = yield* User.Service
     const tokenSvc = yield* AuthToken.Service
+    // yejian: 登录审计服务（best-effort 记录，失败不影响登录主流程）
+    const auditSvc = yield* AuthAudit.Service
 
     return handlers
       .handle("auth.login", (req) =>
@@ -68,19 +81,26 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
           const { username, password } = req.payload
           const request = yield* HttpServerRequest.HttpServerRequest
           const ip = getRequestIP(request)
+          const userAgent = request.headers["user-agent"]
 
           if (!checkRateLimit(ip)) {
+            // yejian: 限速锁定拒绝也记审计——否则爆破时只见 5 条后沉默，看不出持续异常
+            yield* auditSvc.record({ username, action: "login_failed", ip, userAgent })
             return yield* new InvalidRequestError({ message: "登录尝试过多，请 15 分钟后再试" })
           }
 
           const user = yield* userSvc.verifyPassword(username, password)
           if (!user) {
             recordFailedAttempt(ip)
+            // yejian: 登录失败审计（username 为登录尝试的快照，无论用户是否存在）
+            yield* auditSvc.record({ username, action: "login_failed", ip, userAgent })
             return yield* new UnauthorizedError({ message: "用户名或密码错误" })
           }
           clearFailedAttempts(ip)
 
-          const tokenInfo = yield* tokenSvc.create(user.id, request.headers["user-agent"], ip)
+          const tokenInfo = yield* tokenSvc.create(user.id, userAgent, ip)
+          // yejian: 登录成功审计
+          yield* auditSvc.record({ userId: user.id, username: user.username, action: "login", ip, userAgent })
           const maxAge = Math.floor((tokenInfo.expiresAt - Date.now()) / 1000)
 
           // 直接构造带 cookie 的 HttpServerResponse（appendPreResponseHandler 对 plain object 不生效）
@@ -103,9 +123,19 @@ export const AuthHandler = HttpApiBuilder.group(Api, "server.auth", (handlers) =
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
           const token = parseCookie(request.headers.cookie ?? "")
+          // yejian: Authorization 全局中间件已注入 CurrentUser（logout 非公开路径），直接取当前用户记登出审计
+          const user = yield* CurrentUser
           if (token) {
             yield* tokenSvc.revoke(token)
           }
+          // yejian: 登出审计
+          yield* auditSvc.record({
+            userId: user.id,
+            username: user.username,
+            action: "logout",
+            ip: getRequestIP(request),
+            userAgent: request.headers["user-agent"],
+          })
           // 直接构造带清除 cookie 的 HttpServerResponse（appendPreResponseHandler 对 plain object 不生效）
           return clearSessionCookie(HttpServerResponse.jsonUnsafe({ ok: true }))
         }),
