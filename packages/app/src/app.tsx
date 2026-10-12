@@ -57,6 +57,9 @@ const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
 const SkillsPanel = lazy(() => import("@/components/skills-panel"))
 const UsersAdminPage = lazy(() => import("@/pages/admin/users"))
+// yejian: 在线用户 + 登录日志页面（admin 监控功能）
+const OnlineUsersPage = lazy(() => import("@/pages/admin/online"))
+const AuthLogsPage = lazy(() => import("@/pages/admin/auth-logs"))
 const UserSettingsPage = lazy(() => import("@/pages/settings"))
 
 const SessionRoute = Object.assign(
@@ -422,6 +425,9 @@ export function AppInterface(props: {
                 <Route path="/session/:id?" component={SessionRoute} />
               </Route>
               <Route path="/admin/users" component={UsersAdminPage} />
+              {/* yejian: 在线用户 + 登录日志页面（admin 监控功能） */}
+              <Route path="/admin/online" component={OnlineUsersPage} />
+              <Route path="/admin/logs" component={AuthLogsPage} />
               <Route path="/settings" component={UserSettingsPage} />
             </Dynamic>
           </AuthGate>
