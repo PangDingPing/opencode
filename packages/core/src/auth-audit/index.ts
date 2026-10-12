@@ -62,6 +62,15 @@ function localISOString(date: Date): string {
   )
 }
 
+// 控制台时间戳（本地时区，形如 2026-10-12 17:30:00）
+function consoleTimestamp(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  )
+}
+
 // 按天日志文件名（本地日期）：auth-YYYYMMDD.log
 function logFileName(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -116,8 +125,8 @@ export const layer = Layer.effect(
           Effect.catch((e) => Effect.sync(() => console.error("[auth-audit] 日志文件追加失败:", e))),
         )
 
-        // 3. 容器控制台输出（运维可见）
-        console.log(`[auth-audit] ${row.action} user=${row.username} ip=${row.ip ?? "unknown"}`)
+        // 3. 容器控制台输出（运维可见，带本地日期时间）
+        console.log(`[auth-audit] ${consoleTimestamp(now)} ${row.action} user=${row.username} ip=${row.ip ?? "unknown"}`)
 
         // 4. 惰性清理：距上次清理超 24h 时删除 180 天前记录（失败静默，不阻塞主流程）
         if (now.getTime() - lastCleanupAt < CLEANUP_INTERVAL_MS) return
