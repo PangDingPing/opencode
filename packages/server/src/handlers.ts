@@ -4,6 +4,8 @@ import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { defaultLayer as DatabaseDefaultLayer } from "@opencode-ai/core/database/database"
 import { defaultLayer as UserDefaultLayer } from "@opencode-ai/core/user"
 import { defaultLayer as AuthTokenDefaultLayer } from "@opencode-ai/core/auth-token"
+// yejian: 登录审计服务（在线用户 + 登录审计功能）
+import { defaultLayer as AuthAuditDefaultLayer } from "@opencode-ai/core/auth-audit"
 import { Layer } from "effect"
 import { layer as locationLayer } from "./groups/location"
 import { sessionLocationLayer } from "./middleware/session-location"
@@ -28,11 +30,14 @@ import { Credential } from "@opencode-ai/core/credential"
 import { ProjectCopyHandler } from "./handlers/project-copy"
 import { AuthHandler } from "./handlers/auth"
 import { AdminHandler } from "./handlers/admin"
+// yejian: admin 监控 handler（在线用户 + 登录审计）
+import { AdminMonitorHandler } from "./handlers/admin-monitor"
 
 export const handlers = Layer.mergeAll(
   HealthHandler,
   AuthHandler,
   AdminHandler,
+  AdminMonitorHandler, // yejian: 在线用户 + 登录审计端点
   LocationHandler,
   AgentHandler,
   SessionHandler,
@@ -59,4 +64,5 @@ export const handlers = Layer.mergeAll(
   Layer.provide(Credential.defaultLayer),
   Layer.provide(Layer.merge(UserDefaultLayer, DatabaseDefaultLayer)),
   Layer.provide(Layer.merge(AuthTokenDefaultLayer, DatabaseDefaultLayer)),
+  Layer.provide(Layer.merge(AuthAuditDefaultLayer, DatabaseDefaultLayer)), // yejian: 登录审计服务依赖
 )
