@@ -24,6 +24,15 @@ export const UserMenu: Component = () => {
     navigate("/admin/users")
   }
 
+  // yejian: 在线用户 + 登录日志入口（admin 监控功能）
+  const openOnlineUsers = () => {
+    navigate("/admin/online")
+  }
+
+  const openAuthLogs = () => {
+    navigate("/admin/logs")
+  }
+
   const openSettings = () => {
     navigate("/settings")
   }
@@ -68,6 +77,13 @@ export const UserMenu: Component = () => {
           <Show when={isAdmin()}>
             <DropdownMenu.Item onSelect={openUsersAdmin}>
               <DropdownMenu.ItemLabel>用户管理</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            {/* yejian: 在线用户 + 登录日志入口 */}
+            <DropdownMenu.Item onSelect={openOnlineUsers}>
+              <DropdownMenu.ItemLabel>在线用户</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={openAuthLogs}>
+              <DropdownMenu.ItemLabel>登录日志</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
           </Show>
 
