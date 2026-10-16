@@ -216,6 +216,42 @@
           "keyword": "/specification-auto-update <规范关键词>",
           "case": "调用specification-auto-update技能对以下文件或资料提及的规范、标准数据进行更新。\n",
           "prompt": "调用specification-auto-update技能对以下文件或资料提及的规范、标准数据进行更新。\n"
+        },
+        {
+          "name": "图纸预处理",
+          "developing": false,
+          "skillId": "drawing-preprocess",
+          "tooltip": "扫描施工图 PDF/图片是否超出 GLM 视觉输入限制（A0/A1 图幅及复杂矢量图纸直传会报 Invalid request parameters / 10013），批量转换为可正常对话的格式并生成审查用图纸清单。流程：超限扫描 → 报告确认 → 批量转换 → 本地复核 → 生成审查用清单，原始图纸不污染。",
+          "keyword": "图纸预处理、图纸超限、超限图纸、转换图纸、图纸太大发不了、Invalid request parameters、图纸清单",
+          "case": "对 /YEJIAN/1庞定平/某项目/ 图纸文件夹进行预处理",
+          "prompt": "请使用 drawing-preprocess 技能，对以下图纸文件/目录进行超限扫描与预处理转换，并生成审查用图纸清单：\n\n"
+        },
+        {
+          "name": "规范下载",
+          "developing": false,
+          "skillId": "standard-downloader",
+          "tooltip": "输入规范标准号（含/不含年份，如 GB 50068-2018、GB 50292）或标准名称关键字，先查本地规范数据库定位资源，默认把 PDF 直接下载到登录用户个人文件夹下的「标准下载/」（优先带条文说明版本）；找不到直链时才返回网盘/官方下载链接。支持无年份标准号自助推断、联网兜底、学兔兔 QQ 登录下载。",
+          "keyword": "下载规范、下载标准、把标准下到本地、规范PDF下载、标准下载",
+          "case": "下载 GB 50016-2014 建筑设计防火规范",
+          "prompt": "请使用 standard-downloader 技能，下载以下规范标准（可多个），并保存到登录用户个人文件夹下的「标准下载/」：\n\n"
+        },
+        {
+          "name": "提取审查意见",
+          "developing": false,
+          "skillId": "extract-review-comments",
+          "tooltip": "从 .doc/.docx 表格式施工图审查意见单中，逐条提取“违反强制性条文”、“违反专业规范和设计深度不足”、“其它方面”三个分项下的审查意见概述、回复意见、修改落实情况，转换为标准三行式文本，方便直接复制粘贴至技术审查报告。只输出整理后的文字内容，不保存文件。",
+          "keyword": "提取审查意见、提取意见单、整理审查意见、意见单提取、审查意见转文本",
+          "case": "提取 /YEJIAN/1庞定平/给排水意见单.docx 的审查意见",
+          "prompt": "请使用 extract-review-comments 技能，从以下审查意见单文件中提取审查意见（可多个文件）：\n\n"
+        },
+        {
+          "name": "技术审查报告",
+          "developing": false,
+          "skillId": "technical-review-report",
+          "tooltip": "基于项目设计说明、上阶段评审意见及各专业审查意见单，按参考文档格式与标题结构合成技术方案审查报告 Word 文档（含封面、人员表、目录、各专业意见）。内容全部可溯源，缺资料处留占位标注，绝不脑补。内部会调用提取审查意见技能。",
+          "keyword": "生成技术审查报告、技术方案审查报告、把审查意见整理成报告、出具审查报告、审图报告成文",
+          "case": "根据 /YEJIAN/1庞定平/ 项目的设计说明和各专业意见单，生成技术方案审查报告",
+          "prompt": "请使用 technical-review-report 技能，基于以下资料生成技术方案审查报告，并保存到登录用户个人目录：\n【资料一：项目初步设计说明 或 各专业设计说明（二选一，PDF/WORD/MD）】\n（此处填写路径）\n\n【资料二：可研/方案/初步设计等上阶段评审意见及执行情况（PDF/WORD/MD）】\n（此处填写路径）\n\n【资料三：各专业审查意见单（.doc/.docx）】\n（此处填写路径）"
         }
       ]
     },
