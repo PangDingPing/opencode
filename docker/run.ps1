@@ -13,11 +13,11 @@
 
 param(
     [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "",   # default: "yejian-<ImageTag>", e.g. yejian-v0.1.6
-    [string]$ImageTag = "v0.1.6",
+    [string]$ContainerName = "",   # default: "yejian-<ImageTag>", e.g. yejian-v0.1.8
+    [string]$ImageTag = "v0.1.8",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
-    [string]$EnvFile = "E:\AI\dockerimage\api-keys-v0.0.8.env"   # production API keys file
+    [string]$EnvFile = ""   # optional API keys file; empty = no --env-file (matches standard v0.1.8 run command)
 )
 
 if (-not $ContainerName) { $ContainerName = "yejian-$ImageTag" }
@@ -60,6 +60,7 @@ if ($EnvFile -ne "") {
     docker run -d --name $ContainerName `
         -p "${HostPort}:${ContainerPort}" `
         -v "E:\AI\YEJIAN:/YEJIAN" `
+        -v "E:\AI\YEJIAN2:/YEJIAN2" `
         -v "E:\AI\AIworkbench-data\root:/root" `
         -v "yejian-opencode-data:/root/.local/share/opencode" `
         -v "E:\AI\AIworkbench-data\tmp:/tmp" `
@@ -73,6 +74,7 @@ if ($EnvFile -ne "") {
     docker run -d --name $ContainerName `
         -p "${HostPort}:${ContainerPort}" `
         -v "E:\AI\YEJIAN:/YEJIAN" `
+        -v "E:\AI\YEJIAN2:/YEJIAN2" `
         -v "E:\AI\AIworkbench-data\root:/root" `
         -v "yejian-opencode-data:/root/.local/share/opencode" `
         -v "E:\AI\AIworkbench-data\tmp:/tmp" `
