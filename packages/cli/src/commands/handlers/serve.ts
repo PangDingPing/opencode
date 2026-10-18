@@ -1,6 +1,8 @@
 import { NodeHttpServer } from "@effect/platform-node"
 import { Credential } from "@opencode-ai/core/credential"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
+import { Database } from "@opencode-ai/core/database/database"
+import { SessionV2 } from "@opencode-ai/core/session"
 import { Context, Layer, Option } from "effect"
 import * as Effect from "effect/Effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
@@ -38,6 +40,11 @@ function bind(hostname: string, port: number, password: string) {
       Layer.provideMerge(NodeHttpServer.layer(() => createServer(), { port, host: hostname })),
       Layer.provide(Credential.defaultLayer),
       Layer.provide(PermissionSaved.defaultLayer),
+      // yejian: HttpRouter.serve 层的 Database/SessionV2 输入洞需在此喂给——
+      // createRoutes 内部的 provide 满足不到 serve 层的洞，漏出会导致本 handler
+      // 的 R 类型超出 Runtime.handlers 期望（tsgo 报 TS2322）
+      Layer.provide(Database.defaultLayer),
+      Layer.provide(SessionV2.defaultLayer),
     ),
   ).pipe(Effect.map((context) => Context.get(context, HttpServer.HttpServer).address))
 }
