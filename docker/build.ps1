@@ -14,8 +14,8 @@
 
 param(
     [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "yejian-v0.1.7",
-    [string]$ImageTag = "v0.1.7",
+    [string]$ContainerName = "yejian-v0.1.8",
+    [string]$ImageTag = "v0.1.8",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
@@ -83,9 +83,13 @@ try {
 
     # Create data directories
     $workbenchDir = "E:\AI\YEJIAN"
+    $workbenchDir2 = "E:\AI\YEJIAN2"
     $dataDir = "E:\AI\AIworkbench-data"
     if (-not (Test-Path $workbenchDir)) {
         New-Item -ItemType Directory -Path $workbenchDir -Force | Out-Null
+    }
+    if (-not (Test-Path $workbenchDir2)) {
+        New-Item -ItemType Directory -Path $workbenchDir2 -Force | Out-Null
     }
     if (-not (Test-Path $dataDir)) {
         New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -115,6 +119,7 @@ try {
         docker run -d --name $ContainerName `
             -p "${HostPort}:${ContainerPort}" `
             -v "${workbenchDir}:/YEJIAN" `
+            -v "${workbenchDir2}:/YEJIAN2" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -v "yejian-opencode-data:/root/.local/share/opencode" `
@@ -128,6 +133,7 @@ try {
         docker run -d --name $ContainerName `
             -p "${HostPort}:${ContainerPort}" `
             -v "${workbenchDir}:/YEJIAN" `
+            -v "${workbenchDir2}:/YEJIAN2" `
             -v "${dataDir}\root:/root" `
             -v "${dataDir}\tmp:/tmp" `
             -v "yejian-opencode-data:/root/.local/share/opencode" `
