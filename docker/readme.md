@@ -6,9 +6,9 @@
 
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
-- **宿主机端口**：80（v0.0.6 起；之前版本为 8088）
-- **镜像名称**：`yejian-opencode:v0.0.9`
-- **容器名称**：`yejian-AIworkbench`
+- **宿主机端口**：8088（v0.1.8 现行配置）
+- **镜像名称**：`yejian-opencode:v0.1.8`
+- **容器名称**：`yejian-v0.1.8`（命名规则 `yejian-<镜像tag>`，与 build.ps1 / run.ps1 默认值联动）
 - **基础镜像**：`oven/bun:1.3.14-alpine`（builder 阶段）+ `alpine:3.20`（runtime 阶段；v0.0.8 回到 3.20，3.24 装 libreoffice 拉链子慢）
 - **构建策略**：多阶段构建 —— builder 阶段在 Alpine/musl 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary，runtime 阶段只 COPY binary + 装运行时依赖（libreoffice / poppler / uv / pnpm 等）
 - **预装运行时**：Node.js 24 LTS + Python 3.14 + pnpm 11 + LibreOffice + poppler + qpdf + uv（详见 [Skill 运行时依赖](#skill-运行时依赖)）
@@ -17,20 +17,26 @@
 
 ## 快速开始
 
-### 一键构建并启动（含 API key 注入）
+### 一键构建并启动
 
 ```powershell
 cd D:\ai\opencode
-powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1
 ```
 
-> **改了 `packages/app` 里的 web UI 代码**（包括新建/修改了 `packages/app/src/**` 下的文件），必须加 `-ForceRebuild` 强制重建 opencode 二进制（web UI 是嵌入到二进制里的，不重建看不到改动）：
+> **改了源码**（`packages/opencode` / `packages/app` 等）必须加 `-RebuildBuilder` 强制重编 opencode 二进制（web UI 嵌在二进制里，不重编看不到改动）：
 >
 > ```powershell
-> powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env" -ForceRebuild
+> powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -RebuildBuilder
 > ```
 >
-> 不传 `-ForceRebuild` 时，脚本会复用 `packages/opencode/dist/` 里现成的二进制，**不会**自动检测源码是否变更。
+> 不加时走全缓存，builder 层直接复用旧二进制，**不会**自动检测源码是否变更。`-ForceRebuild` 仅在改了 Dockerfile / 依赖 / 缓存损坏时才需要（全量重建 1-2 小时）。
+
+> **v0.1.8 起 API key 默认不注入**：标准启动命令不再带 `--env-file`。需要 API key / HTTP Basic Auth 时加 `-EnvFile`：
+>
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -EnvFile "D:\AI\opencode\docker\api-keys.env"
+> ```
 
 ### 单独使用各脚本
 
@@ -156,27 +162,39 @@ Move-Item .dockerignore.dockerbuild .dockerignore -Force
 
 ### 4. 启动容器
 
+标准启动命令（v0.1.8，与 build.ps1 / run.ps1 内置命令一致）：
+
 ```powershell
-docker run -d --name yejian-AIworkbench -p 8088:8088 `
-  -v "D:\AI\AIworkbench:/workspace" `
-  -v "D:\AI\AIworkbench-data/root:/root" `
-  -v "D:\AI\AIworkbench-data/tmp:/tmp" `
-  -w /workspace `
+docker run -d --name yejian-v0.1.8 -p 8088:8088 `
+  -v "E:\AI\YEJIAN:/YEJIAN" `
+  -v "E:\AI\YEJIAN2:/YEJIAN2" `
+  -v "E:\AI\AIworkbench-data/root:/root" `
+  -v "yejian-opencode-data:/root/.local/share/opencode" `
+  -v "E:\AI\AIworkbench-data/tmp:/tmp" `
+  -w /YEJIAN `
+  -e TZ=Asia/Shanghai `
+  --restart always `
   --hostname 0.0.0.0 `
-  yejian-opencode:v0.0.2
+  yejian-opencode:v0.1.8
 ```
 
 **参数说明**：
 | 参数 | 说明 |
 |------|------|
 | `-d` | 后台运行 |
-| `--name yejian-AIworkbench` | 容器名称 |
+| `--name yejian-v0.1.8` | 容器名称（命名规则 `yejian-<镜像tag>`） |
 | `-p 8088:8088` | 端口映射（宿主机:容器） |
-| `-v ...:/workspace` | 工作目录挂载 |
-| `-v ...:/root` | 容器 root 目录挂载 |
+| `-v ...:/YEJIAN` | 主工作区挂载 |
+| `-v ...:/YEJIAN2` | 第二工作区挂载（v0.1.8 新增） |
+| `-v ...:/root` | 容器 root 目录挂载（含全局 skill `.config/opencode/skills`） |
+| `-v yejian-opencode-data:...` | named volume 挂数据库目录（落在 WSL2 ext4，写路径快 5-10 倍，见 4.5 节） |
 | `-v ...:/tmp` | 临时目录挂载 |
-| `-w /workspace` | 设置工作目录 |
+| `-w /YEJIAN` | 设置工作目录 |
+| `-e TZ=Asia/Shanghai` | 时区（镜像内已烤入同名 ENV，此处显式声明保持一致） |
+| `--restart always` | 开机 / 异常退出自动重启 |
 | `--hostname 0.0.0.0` | 监听所有网卡 |
+
+> 需要 API key / HTTP Basic Auth 时，在 `--restart always` 前加 `--env-file "E:\AI\dockerimage\api-keys.env"`（v0.1.8 起默认不注入）。
 
 ### 4.5 数据迁卷（A1 性能优化，一次性）
 
@@ -867,6 +885,7 @@ curl http://192.168.x.x:8088
 | v0.0.6 | 2026-07-12 | 多用户登录系统 + ppt-master skill 依赖。**(1) 密码哈希跨平台**：`@node-rs/argon2` → `node:crypto.scryptSync`（避免 bun build 跨平台打包硬编码 Windows native binding 路径，Linux 容器启动崩）；**(2) 多用户预置**：`bootstrapAdmin()` 无 `OPENCODE_SERVER_PASSWORD` 时静默跳过（不再 fail-fast），`bootstrapUsers()` 从烤入镜像的 `seed-users.json` 预置用户（admin: yejian/Yejian2016，首次登录强制改密）；**(3) ppt-master 依赖**：新增 `requirements-ppt.txt`（17 个 Python 包，svglib 方案 B 精简版）；**(4) api-keys.env 精简**：无需 `OPENCODE_SERVER_USERNAME/PASSWORD`，HTTP Basic Auth 禁用，多用户登录系统接管；**(5) 默认项目**：`layout.tsx` 已有 `openProject(last ?? "/YEJIAN")` 逻辑，全新容器首次启动自动打开 /YEJIAN 项目；**(6) build.ps1**：默认 tag v0.0.6，启动命令对齐用户实际（`E:\AI\YEJIAN:/YEJIAN` + `--restart always`）|
 | v0.0.7 | 2026-07-13 | 多阶段构建，binary 在 Docker builder 阶段编译（Linux 容器）。**问题**：`@node-rs/argon2` napi binding 在 bun build 跨平台打包时硬编码 Windows native binding 路径，Linux 容器里 `createRequire` 报 `TypeError: must be absolute path` → 崩。**解决**：依赖 `node:crypto.scryptSync`（已 v0.0.6 切换）。**结论**：v0.0.7 实际上没用，纯准备工作版本 |
 | v0.0.8 | 2026-07-13 | 多阶段构建（builder 阶段在 Alpine 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary；runtime 阶段只 COPY binary + 装运行时）+ **国内镜像源**（apk 阿里云 / pip 清华 / npm 淘宝 / bun 淘宝）+ **完善 BuildKit 缓存挂载**（apk/bun/pip/npm 下载缓存持久化）+ alpine 基础镜像 3.24 → 3.20（libreoffice 拉链子更快）。**构建时间**：首次 1-2 小时（vs v0.0.6 的 6-7 小时），有缓存 10-20 分钟（vs v0.0.6 的 3-4 小时）。**修复 3 个运行时 bug**：(a) `xd.node undefined` —— 3 个模块（database/user/auth-token）从 `export const Xxx = {...}` 改回 `export * as Xxx from "..."` 自引用命名空间导出，绕开 Bun compile 把 `export const` 编译为 lazy undefined 的问题；(b) `verify is not defined` —— `user/index.ts` L142 `verify` → `verifyPasswordHash` 函数名 typo；(c) 密码 hash 格式不匹配 —— `hashPassword` 改为生成 PHC 标准格式（旧 hash 是 PHC 格式），`verifyPasswordHash` 同时支持 PHC 和冒号两种格式。**新增 docker/insert-user.py 工具**：bootstrapUsers 在 binary 模式下不工作时（待排查），用 Python 手动插入用户的绕道方案。**详见 [坑 16-20] 和附录"v0.0.8 多阶段构建 + 3 个 bug 修复"** |
+| v0.1.8 | 2026-10-18 | 重建镜像并统一启动命令（v0.0.9~v0.1.7 未记入本表）。**(1) 默认版本升级**：`build.ps1` / `run.ps1` 默认 tag 与容器名升到 v0.1.8（容器名 `yejian-v0.1.8`）；**(2) 新增 `/YEJIAN2` 工作区挂载**：`E:\AI\YEJIAN2:/YEJIAN2`，`build.ps1` 启动前自动创建该目录；**(3) API key 默认不注入**：标准启动命令不再带 `--env-file`，`run.ps1` 的 `-EnvFile` 默认值改为空（需要时传参）；**(4) build.ps1 启动命令与用户实际命令完全对齐**。构建采用 `-RebuildBuilder` 模式（builder 重编 binary，runtime 全缓存，约 1 分钟），容器内 web 服务 HTTP 200 验证通过。**详见附录"v0.1.8 重建镜像 + 启动命令统一"** |
 
 ---
 
@@ -1515,3 +1534,65 @@ bootstrapUsers 在 binary 模式下不工作（坑 20），所以**全新容器�
 
 - v0.0.6：~900MB（Alpine + libreoffice + 全 skill 依赖）
 - v0.0.8：~900MB（无明显变化，多阶段构建不影响 runtime 镜像大小）
+
+---
+
+## 附录：v0.1.8 重建镜像 + 启动命令统一（2026.10.18）
+
+本次按用户给定的标准启动命令重建 v0.1.8 镜像，并把 `build.ps1` / `run.ps1` 的内置启动命令与其完全对齐，消除"脚本默认值与实际命令不一致"的历史遗留问题。
+
+### 一、需求背景
+
+- 用户要求以 v0.1.8 版本号重建镜像，并给出了新的标准 `docker run` 命令
+- 与旧命令相比有两处变化：**新增 `/YEJIAN2` 工作区挂载**（`E:\AI\YEJIAN2`）；**不再注入 `--env-file`**（API key 环境变量默认不带）
+- 旧脚本默认值还停留在 v0.1.7 / v0.1.6 且无 YEJIAN2 挂载，每次都要手动传参，容易出错
+
+### 二、修改文件清单
+
+| # | 文件 | 类型 | 说明 |
+|---|------|------|------|
+| 1 | `docker/build.ps1` | `chore(yejian)` | 默认 `ImageTag`/`ContainerName` 升到 v0.1.8；docker run 两个分支（含/不含 `-EnvFile`）均新增 `-v "E:\AI\YEJIAN2:/YEJIAN2"`；新增 `$workbenchDir2` 变量与目录自动创建 |
+| 2 | `docker/run.ps1` | `chore(yejian)` | 默认 `ImageTag` 升到 v0.1.8；docker run 两个分支均新增 YEJIAN2 挂载；`-EnvFile` 默认值从 `E:\AI\dockerimage\api-keys-v0.0.8.env` 改为空（默认不注入，需要时传参） |
+| 3 | `docker/readme.md` | `docs(yejian)` | 项目说明、快速开始、启动容器章节、变更记录同步 v0.1.8；新增本附录 |
+
+Dockerfile 无改动（本次变更不涉及镜像内容本身）。
+
+### 三、实际 docker run 命令（用户最终使用，v0.1.8 标准）
+
+```powershell
+docker run -d --name yejian-v0.1.8 -p 8088:8088 `
+  -v "E:\AI\YEJIAN:/YEJIAN" `
+  -v "E:\AI\YEJIAN2:/YEJIAN2" `
+  -v "E:\AI\AIworkbench-data/root:/root" `
+  -v "yejian-opencode-data:/root/.local/share/opencode" `
+  -v "E:\AI\AIworkbench-data/tmp:/tmp" `
+  -w /YEJIAN `
+  -e TZ=Asia/Shanghai `
+  --restart always `
+  --hostname 0.0.0.0 `
+  yejian-opencode:v0.1.8
+```
+
+### 四、构建与验证
+
+```powershell
+# 构建（-RebuildBuilder：builder 阶段重编 binary，runtime 全缓存，实测约 1 分钟）
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -RebuildBuilder
+
+# 验证 1：容器状态（应为 Up，端口 0.0.0.0:8088->8088/tcp）
+docker ps --filter "name=yejian-v0.1.8"
+
+# 验证 2：挂载与配置（5 个挂载 + WorkDir /YEJIAN + TZ + restart always）
+docker inspect yejian-v0.1.8 --format "{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}"
+
+# 验证 3：web 服务健康（Alpine 无 curl/wget，用 python3）
+docker exec yejian-v0.1.8 python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8088/', timeout=10).status)"
+```
+
+实测结果：镜像 `yejian-opencode:v0.1.8`（2.34GB）构建成功，容器 `yejian-v0.1.8` 启动后 5 个挂载、工作目录、时区、重启策略全部符合标准命令，容器内 `http://localhost:8088/` 返回 HTTP 200。
+
+### 五、注意事项
+
+- **API key 默认不注入**：v0.1.8 标准命令不带 `--env-file`，容器内无 API key 环境变量。需要时启动命令加 `--env-file`，或脚本传 `-EnvFile "D:\AI\opencode\docker\api-keys.env"`
+- **旧容器 `yejian-v0.1.7` 未删除**（当时已是 Exited 状态），确认 v0.1.8 稳定后可 `docker rm yejian-v0.1.7` 清理；旧镜像 v0.1.7 同理
+- `build.ps1` 会在启动前自动创建 `E:\AI\YEJIAN2`（不存在时），避免挂载失败
