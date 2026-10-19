@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.4
 # opencode Docker image - Multi-stage build (Alpine + musl)
 #
+# v0.1.9: 镜像预装 @playwright/mcp@0.0.83（配合 /root bind mount 的 npx 缓存持久化 +
+#         --prefer-offline，彻底消除实例冷启动时 npx 访问 npm 官方源的数分钟阻塞，
+#         参见 docs：实例初始化超时 + 前端提示实施方案）
 # v0.1.7: Alpine 源换华为云（实测下载快约 55 倍——阿里云约61KB/s 卡死，华为云约3.4MB/s）
 #         含 skills.json 变更（公文排版→gov-doc-format；新增公文写作→chinese-official-writing）
 # v0.1.6: skill 依赖更新（对齐 2026-09-04 重装的 skills 目录）
@@ -140,10 +143,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # - pdf-lib pdfjs-dist: pdf skill JS 路线
 # - pptxgenjs        : pptx skill（PPT 生成）
 # - react-icons react react-dom sharp : pptx skill 图标渲染（react-icons → SVG → sharp 栅格化）
+# - @playwright/mcp  : browser MCP（v0.1.9 预装，实例冷启动不再走 npx 联网下载）
 # v0.1.6: 新增 pptx skill 5 个包；sharp 会按 musl 自动选择 linuxmusl 预编译二进制
 # 使用 cache 挂载持久化 npm 下载缓存
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g docx pdf-lib pdfjs-dist pptxgenjs react-icons react react-dom sharp
+    npm install -g docx pdf-lib pdfjs-dist pptxgenjs react-icons react react-dom sharp @playwright/mcp@0.0.83
 
 # 烤入多用户预置清单（v0.0.6 新增）
 COPY docker/seed-users.json /etc/opencode/seed-users.json
