@@ -36,7 +36,21 @@ export const markInstanceForReload = (ctx: InstanceContext, next: InstanceStore.
   Effect.gen(function* () {
     const marked = yield* mark(ctx)
     return yield* HttpEffect.appendPreResponseHandler((_request, response) =>
-      Effect.as(Effect.uninterruptible(marked.bridge.run(marked.store.reload(next))), response),
+      Effect.as(
+        Effect.uninterruptible(
+          marked.bridge.run(marked.store.reload(next)).pipe(
+            // yejian: 后台 reload 的等待者超时无 HTTP 响应可承载——记日志后视为完成；
+            // 缓存条目保留，后续请求命中同一 Deferred，初始化完成即成功。
+            Effect.catchTag("InstanceInitTimeoutError", (error) =>
+              Effect.logWarning("instance reload waiters timed out", {
+                directory: next.directory,
+                waitedMs: error.waitedMs,
+              }),
+            ),
+          ),
+        ),
+        response,
+      ),
     )
   })
 

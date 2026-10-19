@@ -6,6 +6,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { Provider } from "@/provider/provider"
 import { Context, Effect, Layer, SynchronizedRef } from "effect"
+import { ServiceFailureError } from "./error"
 import type * as ACPError from "./error"
 
 export type ModelOption = {
@@ -112,7 +113,17 @@ export const loaderLayer = Layer.effect(
 
     return Loader.of({
       load: Effect.fn("ACPDirectoryLoader.load")(function* (directory) {
-        const ctx = yield* store.load({ directory })
+        // yejian: ACP 错误协议是封闭 union——实例初始化等待者超时转换为 ServiceFailureError
+        const ctx = yield* store.load({ directory }).pipe(
+          Effect.catchTag("InstanceInitTimeoutError", (error) =>
+            Effect.fail(
+              new ServiceFailureError({
+                safeMessage: `instance initialization timed out after ${error.waitedMs}ms`,
+                service: "InstanceStore",
+              }),
+            ),
+          ),
+        )
         return yield* Effect.gen(function* () {
           const providers = yield* provider.list()
           const [agents, defaultAgent, commands, defaultModel] = yield* Effect.all(

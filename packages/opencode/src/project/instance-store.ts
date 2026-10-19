@@ -7,6 +7,7 @@ import { disposeInstance as runDisposers } from "@/effect/instance-registry"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Context, Deferred, Duration, Effect, Exit, Layer, Scope } from "effect"
 import { type InstanceContext } from "./instance-context"
+import { InstanceInitTimeoutError, instanceInitTimeout } from "./instance-init-timeout"
 import { InstanceBootstrap } from "./bootstrap-service"
 import { InstanceBootstrap as InstanceBootstrapGraph } from "./bootstrap"
 import * as Project from "./project"
@@ -18,12 +19,18 @@ export interface LoadInput {
 }
 
 export interface Interface {
-  readonly load: (input: LoadInput) => Effect.Effect<InstanceContext>
-  readonly reload: (input: LoadInput) => Effect.Effect<InstanceContext>
+  // yejian: load/reload 错误通道含 InstanceInitTimeoutError——等待者超时（HTTP 边界映射 503）
+  readonly load: (input: LoadInput) => Effect.Effect<InstanceContext, InstanceInitTimeoutError>
+  readonly reload: (input: LoadInput) => Effect.Effect<InstanceContext, InstanceInitTimeoutError>
   readonly dispose: (ctx: InstanceContext) => Effect.Effect<void>
   readonly disposeDirectory: (directory: string) => Effect.Effect<void>
   readonly disposeAll: () => Effect.Effect<void>
-  readonly provide: <A, E, R>(input: LoadInput, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
+  // yejian: provide 实现内部把等待者超时消化为 defect（后台/测试路径无人处理），
+  // 错误通道不扩大——HTTP 路径直接调 load，由 instance-context.ts 中间件映射 503。
+  readonly provide: <A, E, R>(
+    input: LoadInput,
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E, R>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/InstanceStore") {}
@@ -69,6 +76,19 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
         return true
       })
 
+    // yejian: 等待者侧超时——仅限制等待方，Deferred 本身与 bootstrap fork 不受影响；
+    // 超时后缓存条目保留，重试命中同一 Deferred，初始化完成即成功。
+    // 清理路径（dispose*）的 Deferred.await 不走这里：清理必须等真实结果。
+    const waitWithTimeout = (deferred: Deferred.Deferred<InstanceContext>, directory: string) => {
+      const started = Date.now()
+      return Deferred.await(deferred).pipe(
+        Effect.timeoutOrElse({
+          duration: instanceInitTimeout(),
+          orElse: () => Effect.fail(new InstanceInitTimeoutError({ directory, waitedMs: Date.now() - started })),
+        }),
+      )
+    }
+
     const completeLoad = (directory: string, input: LoadInput, entry: Entry) =>
       Effect.gen(function* () {
         const exit = yield* Effect.exit(boot({ ...input, directory }))
@@ -105,12 +125,12 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
       return true
     })
 
-    const load = (input: LoadInput): Effect.Effect<InstanceContext> => {
+    const load = (input: LoadInput): Effect.Effect<InstanceContext, InstanceInitTimeoutError> => {
       const directory = FSUtil.resolve(input.directory)
       return Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
           const existing = cache.get(directory)
-          if (existing) return yield* restore(Deferred.await(existing.deferred))
+          if (existing) return yield* restore(waitWithTimeout(existing.deferred, directory))
 
           const entry: Entry = { deferred: Deferred.makeUnsafe<InstanceContext>() }
           cache.set(directory, entry)
@@ -118,12 +138,12 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
             yield* Effect.logInfo("creating instance", { directory: directory })
             yield* completeLoad(directory, input, entry)
           }).pipe(Effect.forkIn(scope, { startImmediately: true }))
-          return yield* restore(Deferred.await(entry.deferred))
+          return yield* restore(waitWithTimeout(entry.deferred, directory))
         }),
       ).pipe(Effect.withSpan("InstanceStore.load"))
     }
 
-    const reload = (input: LoadInput): Effect.Effect<InstanceContext> => {
+    const reload = (input: LoadInput): Effect.Effect<InstanceContext, InstanceInitTimeoutError> => {
       const directory = FSUtil.resolve(input.directory)
       return Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
@@ -139,7 +159,7 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
             }
             yield* completeLoad(directory, input, entry)
           }).pipe(Effect.forkIn(scope, { startImmediately: true }))
-          return yield* restore(Deferred.await(entry.deferred))
+          return yield* restore(waitWithTimeout(entry.deferred, directory))
         }),
       ).pipe(Effect.withSpan("InstanceStore.reload"))
     }
@@ -186,8 +206,15 @@ export const layer: Layer.Layer<Service, never, Project.Service | InstanceBootst
       return yield* cachedDisposeAll
     })
 
+    // yejian: provide 走后台/测试路径，无人能处理超时失败——消化为 defect（泛型 E 不被扩大）；
+    // HTTP 路径由 instance-context.ts 中间件直接调 load 并映射 503，不经过这里。
     const provide = <A, E, R>(input: LoadInput, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
-      load(input).pipe(Effect.flatMap((ctx) => effect.pipe(Effect.provideService(InstanceRef, ctx))))
+      load(input).pipe(
+        Effect.catchTag("InstanceInitTimeoutError", (error) =>
+          Effect.logError("instance init waiters timed out", error).pipe(Effect.andThen(Effect.die(error))),
+        ),
+        Effect.flatMap((ctx) => effect.pipe(Effect.provideService(InstanceRef, ctx))),
+      )
 
     yield* Effect.addFinalizer(() => disposeAll().pipe(Effect.ignore))
 
