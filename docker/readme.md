@@ -772,10 +772,30 @@ v0.0.3 起，镜像里一次性装齐了 `D:\AI\AIworkbench\.trae\skills\` 下 d
 
 ### 预装的 NPM 包（全局）
 
-| 包 | 关联 skill |
+| 包 | 关联 skill / 用途 |
 |---|---|
 | `docx` | docx skill 创建新文档（`require('docx')`） |
 | `pdf-lib` `pdfjs-dist` | pdf skill（reference.md 中的 JS 用法） |
+| `pptxgenjs` `react-icons` `react` `react-dom` `sharp` | pptx skill（PPT 生成 + 图标渲染） |
+| `@playwright/mcp@0.0.83` | browser MCP 预装（v0.1.9，配合 opencode.jsonc 改 bin 直连后冷启动不走 npx 联网下载） |
+
+---
+
+## 实例初始化超时与 MCP 冷启动本地化（v0.1.9）
+
+**背景**：2026-10-19 排障（详见 `自定义改动.md` 1.27 节）——实例冷启动时 browser MCP 走 `npx -y @playwright/mcp` 访问不稳定的 npm 官方源（实测 3 次 ETIMEDOUT ≈ 80s），首个用户请求被无限挂死，前端中止连接后触发 `EPIPE: broken pipe`。
+
+**三层防护**：
+
+1. **层1（运维配置，随 `/root` bind mount 生效）**：`E:\AI\AIworkbench-data\root\.config\opencode\opencode.jsonc` 的 MCP 命令加 `--prefer-offline`——npx 缓存已持久化在宿主机，跳过每次启动的 registry 元数据校验
+2. **层2（镜像预装，v0.1.9 构建生效）**：Dockerfile 全局安装 `@playwright/mcp@0.0.83`；构建后需在容器内验证 bin 名（`docker exec yejian-AIworkbench sh -c "cat /usr/local/lib/node_modules/@playwright/mcp/package.json | grep -A3 bin"`），确认后把 opencode.jsonc 的 MCP 命令从 `npx -y --prefer-offline @playwright/mcp@0.0.83 ...` 换成 bin 直连（如 `mcp-server-playwright ...`）
+3. **S1（代码兜底）**：实例初始化等待者超时——超过时限仍未就绪时返回 `503` + JSON message（前端 toast 提示"环境正在初始化…请稍后重试；输入已恢复"），重试请求在初始化完成后自动成功；bootstrap 本身不被中断
+
+**环境变量**：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `OPENCODE_INSTANCE_INIT_TIMEOUT_MS` | `60000` | 实例初始化等待者超时（毫秒）；设为正整数可覆盖。超时只影响等待中的请求，不中断后台初始化 |
 
 ---
 
