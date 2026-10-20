@@ -10,7 +10,9 @@ import { UserTable } from "../user/sql"
 import { randomBytes } from "crypto"
 import { LayerNode } from "../effect/layer-node"
 
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 天
+// yejian: 会话有效期 4 小时——登录时 Cookie Max-Age 同步为 4 小时，浏览器到点删除，
+// 与是否活跃无关（服务端 extend 续期对浏览器不可见），每天需登录约 2~3 次
+const TOKEN_TTL_MS = 4 * 60 * 60 * 1000 // 4 小时
 const EXTEND_INTERVAL_MS = 5 * 60 * 1000 // 5 分钟惰性续期
 
 // 生成 32 字节随机 token（hex 64 字符）
