@@ -36,16 +36,6 @@ import m33 from "./migration/20260611192811_lush_chimera"
 import m34 from "./migration/20260612174303_project_dir_strategy"
 import m35 from "./migration/20260625120000_add_user_and_ownership"
 import m36 from "./migration/20260625120001_seed_initial_users"
-// yejian: 登录审计表迁移（在线用户 + 登录审计功能）
 import m37 from "./migration/20261012100000_add_auth_audit"
 
-// 注意：原文件使用顶层 await Promise.all([import(...)]) 动态加载迁移模块。
-// Bun compile + splitting:true 会把动态 import 分割成 chunk 文件，
-// 但 chunk 没有被嵌入 binary 的 bunfs，导致运行时 import 失败并死锁。
-// 改为静态 import 确保所有迁移模块被嵌入 binary。
-export const migrations: DatabaseMigration.Migration[] = [
-  m00, m01, m02, m03, m04, m05, m06, m07, m08, m09,
-  m10, m11, m12, m13, m14, m15, m16, m17, m18, m19,
-  m20, m21, m22, m23, m24, m25, m26, m27, m28, m29,
-  m30, m31, m32, m33, m34, m35, m36, m37,
-]
+export const migrations: DatabaseMigration.Migration[] = [m00, m01, m02, m03, m04, m05, m06, m07, m08, m09, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27, m28, m29, m30, m31, m32, m33, m34, m35, m36, m37]
