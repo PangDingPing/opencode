@@ -6,9 +6,9 @@
 
 - **项目**：opencode（AI 编程助手）
 - **目标**：从源码构建 Docker 镜像，提供 Web 服务
-- **宿主机端口**：8088（v0.1.8 现行配置）
-- **镜像名称**：`yejian-opencode:v0.1.8`
-- **容器名称**：`yejian-v0.1.8`（命名规则 `yejian-<镜像tag>`，与 build.ps1 / run.ps1 默认值联动）
+- **宿主机端口**：8088（现行配置）
+- **镜像名称**：`yejian-v1.0:latest`
+- **容器名称**：`yejian-v1.0`（v1.0 起镜像名与容器名统一，与 build.ps1 / run.ps1 默认值联动）
 - **基础镜像**：`oven/bun:1.3.14-alpine`（builder 阶段）+ `alpine:3.20`（runtime 阶段；v0.0.8 回到 3.20，3.24 装 libreoffice 拉链子慢）
 - **构建策略**：多阶段构建 —— builder 阶段在 Alpine/musl 容器内 `bun install` + `bun run build.ts --docker-build` 编译 musl baseline binary，runtime 阶段只 COPY binary + 装运行时依赖（libreoffice / poppler / uv / pnpm 等）
 - **预装运行时**：Node.js 24 LTS + Python 3.14 + pnpm 11 + LibreOffice + poppler + qpdf + uv（详见 [Skill 运行时依赖](#skill-运行时依赖)）
@@ -162,10 +162,10 @@ Move-Item .dockerignore.dockerbuild .dockerignore -Force
 
 ### 4. 启动容器
 
-标准启动命令（v0.1.8，与 build.ps1 / run.ps1 内置命令一致）：
+标准启动命令（v1.0，与 build.ps1 / run.ps1 内置命令一致）：
 
 ```powershell
-docker run -d --name yejian-v0.1.8 -p 8088:8088 `
+docker run -d --name yejian-v1.0 -p 8088:8088 `
   -v "E:\AI\YEJIAN:/YEJIAN" `
   -v "E:\AI\YEJIAN2:/YEJIAN2" `
   -v "E:\AI\AIworkbench-data/root:/root" `
@@ -175,14 +175,14 @@ docker run -d --name yejian-v0.1.8 -p 8088:8088 `
   -e TZ=Asia/Shanghai `
   --restart always `
   --hostname 0.0.0.0 `
-  yejian-opencode:v0.1.8
+  yejian-v1.0:latest
 ```
 
 **参数说明**：
 | 参数 | 说明 |
 |------|------|
 | `-d` | 后台运行 |
-| `--name yejian-v0.1.8` | 容器名称（命名规则 `yejian-<镜像tag>`） |
+| `--name yejian-v1.0` | 容器名称（v1.0 起与镜像名一致） |
 | `-p 8088:8088` | 端口映射（宿主机:容器） |
 | `-v ...:/YEJIAN` | 主工作区挂载 |
 | `-v ...:/YEJIAN2` | 第二工作区挂载（v0.1.8 新增） |
@@ -1616,3 +1616,32 @@ docker exec yejian-v0.1.8 python3 -c "import urllib.request; print(urllib.reques
 - **API key 默认不注入**：v0.1.8 标准命令不带 `--env-file`，容器内无 API key 环境变量。需要时启动命令加 `--env-file`，或脚本传 `-EnvFile "D:\AI\opencode\docker\api-keys.env"`
 - **旧容器 `yejian-v0.1.7` 未删除**（当时已是 Exited 状态），确认 v0.1.8 稳定后可 `docker rm yejian-v0.1.7` 清理；旧镜像 v0.1.7 同理
 - `build.ps1` 会在启动前自动创建 `E:\AI\YEJIAN2`（不存在时），避免挂载失败
+
+---
+
+## 附录：v1.0 重命名（镜像 / 容器统一为 yejian-v1.0）
+
+**背景**：此前镜像名为 `yejian-opencode`、容器名为 `yejian-<镜像tag>`（如 `yejian-v0.1.8`），两者不一致。v1.0 起统一：镜像 `yejian-v1.0:latest`、容器 `yejian-v1.0`。
+
+**改动文件**：
+
+| 文件 | 改动 |
+|------|------|
+| `docker/build.ps1` | 默认 `ImageName` = `yejian-v1.0`、`ImageTag` = `latest`、`ContainerName` = `yejian-v1.0` |
+| `docker/run.ps1` | 同上；容器名未指定时取镜像名 |
+| `docker/export.ps1` | 默认导出 `yejian-v1.0:latest` |
+| `docker/readme.md` | 项目说明、启动命令章节同步 v1.0，新增本附录 |
+
+**数据保留**：named volume 仍为 `yejian-opencode-data`，数据库、登录态、会话历史随卷保留，改名不影响已有数据。
+
+**构建与验证**：
+
+```powershell
+# 改了源码后重建（只重编 builder，runtime 走缓存）
+powershell -ExecutionPolicy Bypass -File .\docker\build.ps1 -RebuildBuilder
+
+# 验证
+docker ps --filter "name=yejian-v1.0"
+docker exec yejian-v1.0 python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8088/', timeout=10).status)"
+```
+

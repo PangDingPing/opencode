@@ -4,8 +4,8 @@
 # Usage: .\export.ps1
 
 param(
-    [string]$ImageName = "yejian-opencode",
-    [string]$ImageTag = "v0.0.1",
+    [string]$ImageName = "yejian-v1.0",
+    [string]$ImageTag = "latest",
     [string]$OutputDir = "D:\AI"
 )
 

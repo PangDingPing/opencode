@@ -4,7 +4,7 @@
 #   - Workspace:  E:\AI\YEJIAN -> /YEJIAN (working dir, stays on bind mount)
 #   - DB dir:     /root/.local/share/opencode now on named volume "yejian-opencode-data"
 #                 (lives on WSL2 ext4, bypasses gRPC-FUSE bind-mount overhead, 5-10x faster DB writes)
-#   - Container name defaults to "yejian-<ImageTag>" (e.g. yejian-v0.1.6), --restart always
+#   - Container name defaults to "yejian-v1.0" (image yejian-v1.0:latest), --restart always
 # NOTE: the named volume must be populated once via the migration steps in
 #       docker/readme.md section 4.5 BEFORE first use, otherwise the database
 #       inside the container will be empty.
@@ -12,15 +12,15 @@
 #       (see readme.md "pitfall 1" for the encoding pitfall this prevents)
 
 param(
-    [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "",   # default: "yejian-<ImageTag>", e.g. yejian-v0.1.8
-    [string]$ImageTag = "v0.1.8",
+    [string]$ImageName = "yejian-v1.0",
+    [string]$ContainerName = "",   # default: "yejian-v1.0"
+    [string]$ImageTag = "latest",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
-    [string]$EnvFile = ""   # optional API keys file; empty = no --env-file (matches standard v0.1.8 run command)
+    [string]$EnvFile = ""   # optional API keys file; empty = no --env-file
 )
 
-if (-not $ContainerName) { $ContainerName = "yejian-$ImageTag" }
+if (-not $ContainerName) { $ContainerName = $ImageName }
 
 Write-Host "=== Starting opencode container ===" -ForegroundColor Cyan
 Write-Host "Image: ${ImageName}:${ImageTag}" -ForegroundColor Yellow

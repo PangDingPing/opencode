@@ -1,5 +1,7 @@
 ﻿# Builds opencode Docker image using multi-stage build
 #
+# v1.0: 镜像/容器命名改为 yejian-v1.0（镜像 yejian-v1.0:latest）
+#
 # v0.0.8: 构建加速优化
 #         - 国内镜像源（apt 清华 / pip 清华 / npm 淘宝 / bun 淘宝）
 #         - 完善 BuildKit 缓存挂载（apt/bun/pip/npm 下载缓存持久化）
@@ -13,9 +15,9 @@
 #   3. Run container
 
 param(
-    [string]$ImageName = "yejian-opencode",
-    [string]$ContainerName = "yejian-v0.1.8",
-    [string]$ImageTag = "v0.1.8",
+    [string]$ImageName = "yejian-v1.0",
+    [string]$ContainerName = "yejian-v1.0",
+    [string]$ImageTag = "latest",
     [int]$HostPort = 8088,
     [int]$ContainerPort = 8088,
     [string]$EnvFile = "",       # Optional: .env file path injected via --env-file
